@@ -65,8 +65,10 @@ cant_maternales_depto = consultarCantNivelesPorDepto('Maternal', 'Maternales')
 cant_jardin_depto = consultarCantNivelesPorDepto('Jardin', 'Jardines')
 cant_primaria_depto = consultarCantNivelesPorDepto('Primario', 'Primarios')
 cant_secundaria_depto = consultarCantNivelesPorDepto('Secundario', 'Secundarios')
+cant_secuInet_depto = consultarCantNivelesPorDepto("SecuInet", 'SecundariosInet')
+cant_snu_depto = consultarCantNivelesPorDepto("Snu", 'SNUs')
+cant_snuInet_depto = consultarCantNivelesPorDepto("SnuInet", 'SNUsInet')
 
-                   
 #%%padron_poblacional = Datos de poblacion por departamento
 
 padron_poblacional = pd.read_excel("padron_poblacion.xlsX", skiprows=12, header=None)
@@ -157,20 +159,13 @@ def consultarPobPorRangos(edad_minima:int, edad_maxima:int, nombre_poblacion:str
 
 
 pob_maternal_depto = consultarPobPorRangos(0, 2, "Poblacion_Maternal")
-
-
 pob_jardin_depto = consultarPobPorRangos(3, 5, "Poblacion_Jardin")
-
 # Se solapan las poblaciones de 12 años
 pob_primaria_depto = consultarPobPorRangos(6, 12, "Poblacion_Primaria")
-
 pob_secu_depto = consultarPobPorRangos(12, 18, "Poblacion_Secundaria")
-
+pob_secuInet_depto = consultarPobPorRangos(12, 18, "Poblacion_Secundaria_Inet")
 pob_terciaria_joven = consultarPobPorRangos(18, 25, 'Poblacion_Terciaria_Joven')
-
 pob_terciaria_mayor = consultarPobPorRangos(25, 54, 'Poblacion_Terciaria_Mayor')
-# EN TERCIARIOS HAY QUE TOMAR DESICIONES (DEJO PENDIENTE)
-
 
 
 #%% Datos por Departamento, Actividad y Género
@@ -186,19 +181,110 @@ consultaDatos2022 = """
 deptos_actividad_genero = dd.sql(consultaDatos2022).df()
 
 consultaTablaProvincias =   """
-                                SELECT DISTINCT provincia_id, provincia
+                                SELECT DISTINCT 
+                                    provincia_id AS Id_Provincia, 
+                                    provincia AS Provincia
                                 FROM deptos_actividad_genero;
                             """
 tabla_provincias = dd.sql(consultaTablaProvincias).df()
 
 consultaTablaDeptos =   """
-                            SELECT DISTINCT in_departamentos, departamento, provincia_id
+                            SELECT DISTINCT 
+                                in_departamentos AS Cod_Departamento, 
+                                departamento AS Departamento, 
+                                provincia_id AS Id_Provincia
                             FROM  deptos_actividad_genero
-                            ORDER in_departamentos ASC;
+                            ORDER BY in_departamentos ASC;
                         """
 tabla_deptos = dd.sql(consultaTablaDeptos).df()
 
+#%% Formo la tabla del punto uno
+
+"""
+Las tablas de poblacion se ven 
+|Cod_Departamento|Departamento|Poblacion_X|
+
+Las tablas de cant EE de nivel X por depto se ven
+|Provincia|Departamento|Xs|
+
+El problema es que si hacemos inner join por nombre de departamento podemos mezclar con los que son de distintas 
+provincias.
+Para ello voy a utilizar la tabla_deptos también.
+
+1- Agregar la provincia a los pob_X_depto
+2- inner join por Departamento y Provincia
+"""
 
 
+ls_tablas_cant_nivel_depto = [
+    cant_maternales_depto,
+    cant_jardin_depto,
+    cant_primaria_depto,
+    cant_secundaria_depto,
+    cant_secuInet_depto,
+    cant_snu_depto,
+    cant_snuInet_depto]
 
+consultaDeptosProvinciaNombre = """
+SELECT Cod_Departamento, Departamento, tabla_provincias.Provincia
+FROM tabla_deptos
+INNER JOIN tabla_provincias
+ON tabla_deptos.Id_Provincia = tabla_provincias.Id_Provincia;
+"""
+
+tabla_deptos_provincia = dd.sql(consultaDeptosProvinciaNombre).df()
+
+def agregarColumnaProvincia(nombre_df:str, nombre_col_pob:str):
+    consultaAgregarProvinciaAPoblaciones = f"""
+        SELECT 
+            deptos.Provincia,
+            {nombre_df}.Departamento,
+            {nombre_df}.{nombre_col_pob}
+        FROM {nombre_df}
+        INNER JOIN tabla_deptos_provincia as deptos
+        ON {nombre_df}.Cod_Departamento = deptos.Cod_Departamento;
+        """
+    return dd.sql(consultaAgregarProvinciaAPoblaciones).df()
+
+pob_maternal_depto = agregarColumnaProvincia("pob_maternal_depto", "Poblacion_Maternal")
+pob_jardin_depto = agregarColumnaProvincia("pob_jardin_depto", "Poblacion_Jardin")
+pob_primaria_depto = agregarColumnaProvincia("pob_primaria_depto", "Poblacion_Primaria")
+pob_secu_depto = agregarColumnaProvincia("pob_secu_depto", "Poblacion_Secundaria")
+pob_secuInet_depto = agregarColumnaProvincia("pob_secuInet_depto", "Poblacion_Secundaria_Inet")
+pob_terciaria_joven = agregarColumnaProvincia("pob_terciaria_joven", "Poblacion_Terciaria_Joven")
+pob_terciaria_mayor = agregarColumnaProvincia("pob_terciaria_mayor", "Poblacion_Terciaria_Mayor")
+
+#%%Join de cant establecimientos por nivel por depto y su poblacion
+def join_poblacion_cant(pob:str, col_pob:str, cant:str, col_cant:str):
+    consulta = f"""
+        SELECT 
+            {cant}.Provincia,
+            {cant}.Departamento,
+            {cant}.{col_cant},
+            {pob}.{col_pob}
+        FROM {cant}
+        INNER JOIN {pob}
+        ON {cant}.Departamento = {pob}.Departamento AND {cant}.Provincia = {pob}.Provincia
+        """
+    return dd.sql(consulta).df()
+
+maternalesYpoblacion = join_poblacion_cant("pob_maternal_depto", "Poblacion_Maternal", 
+                                             "cant_maternales_depto", "Maternales")
+
+jardinesYpoblacion = join_poblacion_cant("pob_jardin_depto", "Poblacion_Jardin", 
+                                      "cant_jardin_depto", "Jardines")
+
+primariasYpoblacion = join_poblacion_cant("pob_primaria_depto", "Poblacion_Primaria", 
+                                        "cant_primaria_depto", "Primarios")
+
+secundariasYpoblacion = join_poblacion_cant("pob_secu_depto", "Poblacion_Secundaria", 
+                                          "cant_secundaria_depto", "Secundarios")
+
+secuInetYpoblacion = join_poblacion_cant("pob_secuInet_depto", "Poblacion_Secundaria_Inet", 
+                                        "cant_secuInet_depto", "SecundariosInet")
+
+snuYpoblacion = join_poblacion_cant("pob_terciaria_joven", "Poblacion_Terciaria_Joven", 
+                                   "cant_snu_depto", "SNUs")
+snuInetYpoblacion = join_poblacion_cant("pob_terciaria_mayor", "Poblacion_Terciaria_Mayor", 
+                                       "cant_snuInet_depto", "SNUsInet")
 
