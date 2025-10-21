@@ -125,50 +125,31 @@ padron_pob_limpio['Edad'] = edades
 padron_pob_limpio['Casos'] = casos
 
 #%% modifico datos para que coincidan con las otras tablas
-consultaDeptosEnMayusculas = """
-    SELECT
-        Cod_Departamento,
-        UPPER(Departamento) AS Departamento,
-        Edad,
-        Casos
-    FROM padron_pob_limpio
-    """
-padron_pob_limpio = dd.sql(consultaDeptosEnMayusculas).df()
-
-
-reemplazar = """
-    REPLACE(
-            REPLACE(
+def upperSinTildes(columna:str)->str:
+    
+    res = f"""
+        REPLACE(
                 REPLACE(
                     REPLACE(
-                        REPLACE(Departamento, 'Á', 'A'),
-                    'É', 'E'),
-                'Í', 'I'),
-            'Ó', 'O'),
-        'Ú', 'U') AS Departamento
-    """
+                        REPLACE(
+                            REPLACE(UPPER({columna}), 'Á', 'A'),
+                        'É', 'E'),
+                    'Í', 'I'),
+                'Ó', 'O'),
+            'Ú', 'U')
+        """
+    return res
 
-
+deptosSinTildes = upperSinTildes("Departamento")
 consultaDeptosSinAcentos =  f"""
                                 SELECT 
                                     Cod_Departamento,
-                                    {reemplazar},
+                                    {deptosSinTildes} AS Departamento,
                                     Edad,
                                     Casos
-                                FROM 
-                                    (SELECT * FROM padron_pob_limpio)
+                                FROM padron_pob_limpio
                             """
 padron_pob_limpio = dd.sql(consultaDeptosSinAcentos).df()
-#%% ESTABA PROBANDO: obtuve la poblacion total de cada departamento
-
-consultaPoblacionTotalPorDeptos =   """
-                                        SELECT Cod_Departamento, Departamento, SUM(Casos) as Poblacion_total,
-                                        FROM padron_pob_limpio
-                                        GROUP BY Cod_Departamento, Departamento;
-                                    """
-departamentos_poblacion_total = dd.sql(consultaPoblacionTotalPorDeptos).df()
-
-
 
 #%% busco la cantidad de personas que hay respecto a cada nivel educativo
 """
@@ -207,10 +188,22 @@ pob_terciaria_mayor = consultarPobPorRangos(25, 54, 'Poblacion_Terciaria_Mayor')
 
 deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
 
-consultaDatos2022 = """
-                        SELECT *
+#Tambien hay que poner todo en mayusculas y sin acentos.
+deptos = upperSinTildes("departamento")
+provincia = upperSinTildes("provincia")
+consultaDatos2022 = f"""
+                        SELECT 
+                            in_departamentos,
+                            {deptos} AS departamento,
+                            provincia_id,
+                            {provincia} AS provincia,
+                            clae6,
+                            UPPER(genero)
+                            Empleo,
+                            Establecimientos,
+                            empresas_exportadoras
                         FROM deptos_actividad_genero
-                        WHERE anio = 2022;
+                        WHERE anio = 2022
                     """
 
 deptos_actividad_genero = dd.sql(consultaDatos2022).df()
