@@ -42,7 +42,7 @@ Establecimientos = dd.sql(consultaSoloComunes).df()
 
 #Eliminamos Cueanexo
 elimino = """
-            SELECT Jurisdicción as Provincia, Departamento, "Nivel inicial - Jardín maternal" as Maternal,
+            SELECT UPPER(Jurisdicción) as Provincia, UPPER(Departamento) as Departamento, "Nivel inicial - Jardín maternal" as Maternal,
             "Nivel inicial - Jardín de infantes" as Jardin, Primario, Secundario,
             "Secundario - INET" as SecuInet, "SNU" as Snu, "SNU - INET" as SnuInet
             FROM Establecimientos;
@@ -124,6 +124,40 @@ padron_pob_limpio['Departamento'] = deptos
 padron_pob_limpio['Edad'] = edades
 padron_pob_limpio['Casos'] = casos
 
+#%% modifico datos para que coincidan con las otras tablas
+consultaDeptosEnMayusculas = """
+    SELECT
+        Cod_Departamento,
+        UPPER(Departamento) AS Departamento,
+        Edad,
+        Casos
+    FROM padron_pob_limpio
+    """
+padron_pob_limpio = dd.sql(consultaDeptosEnMayusculas).df()
+
+
+reemplazar = """
+    REPLACE(
+            REPLACE(
+                REPLACE(
+                    REPLACE(
+                        REPLACE(Departamento, 'Á', 'A'),
+                    'É', 'E'),
+                'Í', 'I'),
+            'Ó', 'O'),
+        'Ú', 'U') AS Departamento
+    """
+
+
+consultaDeptosSinAcentos =  f"""
+                                SELECT 
+                                    Cod_Departamento, 
+                                    {reemplazar},
+                                    Edad,
+                                    Casos
+                                FROM padron_pob_limpio
+                            """
+padron_pob_limpio = dd.sql(consultaDeptosSinAcentos).df()
 #%% ESTABA PROBANDO: obtuve la poblacion total de cada departamento
 
 consultaPoblacionTotalPorDeptos =   """
