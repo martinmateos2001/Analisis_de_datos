@@ -40,11 +40,33 @@ consultaSoloComunes = """
 
 Establecimientos = dd.sql(consultaSoloComunes).df()
 
+def upperSinTildes(columna:str)->str:
+    
+    res = f"""
+            REPLACE(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(UPPER({columna}), 'Á', 'A'),
+                            'É', 'E'),
+                        'Í', 'I'),
+                    'Ó', 'O'),
+                'Ú', 'U')
+            """
+    return res
+
+jur = upperSinTildes("Jurisdicción")
+dep = upperSinTildes("Departamento")
 #Eliminamos Cueanexo
-elimino = """
-            SELECT UPPER(Jurisdicción) as Provincia, UPPER(Departamento) as Departamento, "Nivel inicial - Jardín maternal" as Maternal,
-            "Nivel inicial - Jardín de infantes" as Jardin, Primario, Secundario,
-            "Secundario - INET" as SecuInet, "SNU" as Snu, "SNU - INET" as SnuInet
+elimino = f"""
+            SELECT 
+                REPLACE({jur}, 'CIUDAD DE BUENOS AIRES', 'CABA') as Provincia, 
+                REPLACE({dep},'1§ DE MAYO', '1 DE MAYO') as Departamento, 
+                "Nivel inicial - Jardín maternal" as Maternal,
+                "Nivel inicial - Jardín de infantes" as Jardin, 
+                Primario, Secundario,
+                "Secundario - INET" as SecuInet, 
+                "SNU" as Snu, "SNU - INET" as SnuInet
             FROM Establecimientos;
           """
 
@@ -125,26 +147,13 @@ padron_pob_limpio['Edad'] = edades
 padron_pob_limpio['Casos'] = casos
 
 #%% modifico datos para que coincidan con las otras tablas
-def upperSinTildes(columna:str)->str:
-    
-    res = f"""
-        REPLACE(
-                REPLACE(
-                    REPLACE(
-                        REPLACE(
-                            REPLACE(UPPER({columna}), 'Á', 'A'),
-                        'É', 'E'),
-                    'Í', 'I'),
-                'Ó', 'O'),
-            'Ú', 'U')
-        """
-    return res
+
 
 deptosSinTildes = upperSinTildes("Departamento")
 consultaDeptosSinAcentos =  f"""
                                 SELECT 
                                     Cod_Departamento,
-                                    {deptosSinTildes} AS Departamento,
+                                    REPLACE({deptosSinTildes}, '1º DE MAYO', '1 DE MAYO') AS Departamento,
                                     Edad,
                                     Casos
                                 FROM padron_pob_limpio
@@ -184,7 +193,7 @@ pob_terciaria_joven = consultarPobPorRangos(18, 25, 'Poblacion_Terciaria_Joven')
 pob_terciaria_mayor = consultarPobPorRangos(25, 54, 'Poblacion_Terciaria_Mayor')
 
 
-#%% Datos por Departamento, Actividad y Género
+#%% Datos por Departamento, Actividad y Género 
 
 deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
 
@@ -193,15 +202,15 @@ deptos = upperSinTildes("departamento")
 provincia = upperSinTildes("provincia")
 consultaDatos2022 = f"""
                         SELECT 
-                            in_departamentos,
-                            {deptos} AS departamento,
-                            provincia_id,
-                            {provincia} AS provincia,
+                            in_departamentos AS Cod_Departamento,
+                            {deptos} AS Departamento,
+                            provincia_id AS Id_Provincia,
+                            {provincia} AS Provincia,
                             clae6,
-                            UPPER(genero)
+                            UPPER(genero) AS Genero,
                             Empleo,
                             Establecimientos,
-                            empresas_exportadoras
+                            empresas_exportadoras AS Exportadoras
                         FROM deptos_actividad_genero
                         WHERE anio = 2022
                     """
@@ -210,22 +219,31 @@ deptos_actividad_genero = dd.sql(consultaDatos2022).df()
 
 consultaTablaProvincias =   """
                                 SELECT DISTINCT 
-                                    provincia_id AS Id_Provincia, 
-                                    provincia AS Provincia
+                                    Id_Provincia, 
+                                    Provincia
                                 FROM deptos_actividad_genero;
                             """
 tabla_provincias = dd.sql(consultaTablaProvincias).df()
 
 consultaTablaDeptos =   """
                             SELECT DISTINCT 
-                                in_departamentos AS Cod_Departamento, 
-                                departamento AS Departamento, 
-                                provincia_id AS Id_Provincia
+                                Cod_Departamento, 
+                                Departamento, 
+                                Id_Provincia
                             FROM  deptos_actividad_genero
-                            ORDER BY in_departamentos ASC;
+                            ORDER BY Cod_Departamento ASC;
                         """
 tabla_deptos = dd.sql(consultaTablaDeptos).df()
 
+#Resultado P2
+consultaTotalEmpleados = """
+                            SELECT DISTINCT Provincia, Departamento, COUNT(Empleo) AS 'Cantidad total de empleados en 2022'
+                            FROM deptos_actividad_genero
+                            GROUP BY Provincia, Departamento
+                            ORDER BY Provincia ASC, "Cantidad total de empleados en 2022" DESC;
+                            """
+                            
+empleados_por_departamento = dd.sql(consultaTotalEmpleados).df()
 #%% Formo la tabla del punto uno
 
 """
@@ -242,16 +260,6 @@ Para ello voy a utilizar la tabla_deptos también.
 1- Agregar la provincia a los pob_X_depto
 2- inner join por Departamento y Provincia
 """
-
-
-ls_tablas_cant_nivel_depto = [
-    cant_maternales_depto,
-    cant_jardin_depto,
-    cant_primaria_depto,
-    cant_secundaria_depto,
-    cant_secuInet_depto,
-    cant_snu_depto,
-    cant_snuInet_depto]
 
 consultaDeptosProvinciaNombre = """
 SELECT Cod_Departamento, Departamento, tabla_provincias.Provincia
@@ -315,4 +323,86 @@ snuYpoblacion = join_poblacion_cant("pob_terciaria_joven", "Poblacion_Terciaria_
                                    "cant_snu_depto", "SNUs")
 snuInetYpoblacion = join_poblacion_cant("pob_terciaria_mayor", "Poblacion_Terciaria_Mayor", 
                                        "cant_snuInet_depto", "SNUsInet")
+
+#%% Punto 1 resultado - Join de la cantidad de establecimiento por nivel y sus respectivas poblaciones
+
+# Genero diccionario para poder iterar las consultas de JOIN, la primera queda comentada pues se hizo en una variable aparte
+
+diccJ = {
+        # "maternalesYpoblacion": 
+        #     {
+        #         "pob":"Poblacion_Maternal",
+        #         "cant" : "Maternales"
+        #     },
+        # "jardinesYpoblacion":
+        #     {
+        #         "pob":"Poblacion_Jardin",
+        #         "cant" :"Jardines"
+        #     },
+        "primariasYpoblacion":
+            {
+                "pob": "Poblacion_Primaria",
+                "cant": "Primarios"
+            },
+        "secundariasYpoblacion":
+            {
+                "pob": "Poblacion_Secundaria",
+                "cant": "Secundarios"
+            },
+        "secuInetYpoblacion":
+            {
+                "pob":"Poblacion_Secundaria_Inet",
+                "cant":"SecundariosInet"
+            },
+        "snuYpoblacion":
+            {
+                "pob":"Poblacion_Terciaria_Joven",
+                "cant": "SNUs"                
+            },
+        "snuInetYpoblacion":
+            {
+                "pob":"Poblacion_Terciaria_Mayor",
+                "cant":"SNUsInet"
+            }
+        }
+
+
+
+    
+consultaPrimerJoin =    """
+                            SELECT 
+                                m.*,
+                                j.Jardines,
+                                j.Poblacion_Jardin
+                            FROM maternalesYpoblacion AS m
+                            INNER JOIN jardinesYpoblacion AS j
+                            ON m.Departamento = j.Departamento AND m.Provincia = j.Provincia
+                        """
+    
+uniones = dd.sql(consultaPrimerJoin).df()
+    
+for k,v in diccJ.items():
+    #Sin estos reemplazos sintacticos, el codigo se rompe.
+
+    pob = v["pob"]
+    cant = v["cant"]
+    
+    consulta = f"""
+        SELECT
+            uniones.*,
+            {k}.{cant},
+            {k}.{pob}
+        FROM uniones
+        INNER JOIN {k}
+        ON uniones.Departamento = {k}.Departamento AND uniones.Provincia = {k}.Provincia
+        """
+    
+    uniones=dd.sql(consulta).df()
+        
+
+
+
+
+
+
 
