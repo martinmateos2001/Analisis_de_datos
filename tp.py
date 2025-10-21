@@ -151,11 +151,12 @@ reemplazar = """
 
 consultaDeptosSinAcentos =  f"""
                                 SELECT 
-                                    Cod_Departamento, 
+                                    Cod_Departamento,
                                     {reemplazar},
                                     Edad,
                                     Casos
-                                FROM padron_pob_limpio
+                                FROM 
+                                    (SELECT * FROM padron_pob_limpio)
                             """
 padron_pob_limpio = dd.sql(consultaDeptosSinAcentos).df()
 #%% ESTABA PROBANDO: obtuve la poblacion total de cada departamento
