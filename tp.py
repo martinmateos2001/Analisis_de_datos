@@ -30,6 +30,8 @@ AA - SNU - INET
 Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
                                  skiprows=6, usecols= columnas_ee)
 
+
+
 #Eliminamos los establecimientos que no son comunes
 consultaSoloComunes = """
                       SELECT *
@@ -398,7 +400,19 @@ for k,v in diccJ.items():
         """
     
     uniones=dd.sql(consulta).df()
-        
+
+#%% Ejercicio 3
+
+ee = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
+                                 skiprows=6, usecols= columnas_ee)
+
+consultaTotalEE =  """
+                    SELECT DISTINC Jurisdicción, Departamento, COUNT (Departamento)
+                    FROM ee
+                    GROUP BY Jurisdicción, Departamento
+                    WHERE Común='1'
+                    """
+total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
 
 
 
