@@ -233,9 +233,6 @@ consultaTablaDeptos =   """
                                 Departamento, 
                                 Id_Provincia
                             FROM  deptos_actividad_genero
-<<<<<<< HEAD
-                            ORDER BY in_departamentos ASC;
-=======
                             ORDER BY Cod_Departamento ASC;
 >>>>>>> rama_martin
                         """
