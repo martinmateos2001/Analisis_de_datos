@@ -74,6 +74,8 @@ elimino = f"""
 
 Establecimientos = dd.sql(elimino).df()
 
+Establecimientos.to_excel('Establecimientos_limpio.xlsx')
+
 #%% Buscamos la cantidad de establecimientos que hay de cada nivel
 
 def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
@@ -219,6 +221,8 @@ consultaDatos2022 = f"""
 
 deptos_actividad_genero = dd.sql(consultaDatos2022).df()
 
+deptos_actividad_genero.to_excel('exportacion_actividad_genero.xlsx')
+
 consultaTablaProvincias =   """
                                 SELECT DISTINCT 
                                     Id_Provincia, 
@@ -234,7 +238,6 @@ consultaTablaDeptos =   """
                                 Id_Provincia
                             FROM  deptos_actividad_genero
                             ORDER BY Cod_Departamento ASC;
->>>>>>> rama_martin
                         """
 tabla_deptos = dd.sql(consultaTablaDeptos).df()
 
@@ -407,13 +410,13 @@ for k,v in diccJ.items():
 ee = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
                                  skiprows=6, usecols= columnas_ee)
 
-consultaTotalEE =  """
-                    SELECT DISTINC Jurisdicción, Departamento, COUNT (Departamento)
-                    FROM ee
-                    GROUP BY Jurisdicción, Departamento
-                    WHERE Común='1'
-                    """
-total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
+# consultaTotalEE =  """
+#                     SELECT DISTINC Jurisdicción, Departamento, COUNT (Departamento)
+#                     FROM ee
+#                     GROUP BY Jurisdicción, Departamento
+#                     WHERE Común='1'
+#                     """
+# total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
 
 
 
