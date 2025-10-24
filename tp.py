@@ -7,14 +7,12 @@ import pandas as pd
 import duckdb as dd
 import numpy as np
 
-#%%Establecimientos: Data frame de Establecimientos Educativos del padròn del 2022
+#%%Limpieza del Dataset Establecimientos Educativos
 
 
-columnas_ee = 'A:C,L,N,U:AA'
+columnas_ee = 'A,L,N,U:AA'
 """
 A - Jurisdiccion
-B - Cueanexo
-C - Nombre
 L - Departamento
 N - Común
 U - Jardin maternal
@@ -33,14 +31,9 @@ Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativo
 
 
 #Eliminamos los establecimientos que no son comunes
-consultaSoloComunes = """
-                      SELECT *
-                      FROM Establecimientos
-                      WHERE "Común" = '1';
 
-                      """
 
-Establecimientos = dd.sql(consultaSoloComunes).df()
+
 
 def upperSinTildes(columna:str)->str:
     
@@ -69,16 +62,18 @@ elimino = f"""
                 Primario, Secundario,
                 "Secundario - INET" as SecuInet, 
                 "SNU" as Snu, "SNU - INET" as SnuInet
-            FROM Establecimientos;
+                
+            FROM Establecimientos
+            WHERE Común = '1';
           """
 
 Establecimientos = dd.sql(elimino).df()
 
 
-# Establecimientos.to_excel('Establecimientos_limpio.xlsx')
+Establecimientos.to_excel('Establecimientos_limpio.xlsx')
 
 
-#%% Buscamos la cantidad de establecimientos que hay de cada nivel
+#%% Buscamos la cantidad de establecimientos Educativos que hay de cada nivel de modalidad común
 
 def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
     consulta =  f"""
@@ -96,25 +91,10 @@ cant_secundaria_depto = consultarCantNivelesPorDepto('Secundario', 'Secundarios'
 cant_secuInet_depto = consultarCantNivelesPorDepto("SecuInet", 'SecundariosInet')
 cant_snu_depto = consultarCantNivelesPorDepto("Snu", 'SNUs')
 cant_snuInet_depto = consultarCantNivelesPorDepto("SnuInet", 'SNUsInet')
-
-#%%padron_poblacional = Datos de poblacion por departamento
+#%% Reconstrucción del padron limpio
 
 padron_poblacional = pd.read_excel("padron_poblacion.xlsX", skiprows=12, header=None)
 
-#las ultimas 4 filas no sirven     
-f_malas = []   
-i:int() = len(padron_poblacional)-5
-while(i < len(padron_poblacional)):     #las ultimas 4
-    f_malas.append(i)
-    i = i + 1
-
-padron_poblacional.drop(index=f_malas, inplace=True, axis=0)
-
-#Elimino la columna vacia y las filas vacias.
-padron_poblacional.dropna(axis=1, how='all', inplace=True)
-padron_poblacional.dropna(axis=0, how='all', inplace=True)
-
-#%% padron limpio
 padron_pob_limpio = pd.DataFrame(columns=['Cod_Departamento', 'Departamento', 'Edad', 'Casos'])
 areas = []
 deptos = []
@@ -152,7 +132,7 @@ padron_pob_limpio['Departamento'] = deptos
 padron_pob_limpio['Edad'] = edades
 padron_pob_limpio['Casos'] = casos
 
-#%% modifico datos para que coincidan con las otras tablas
+# modifico datos para que coincidan con las otras tablas
 
 
 deptosSinTildes = upperSinTildes("Departamento")
@@ -224,6 +204,8 @@ consultaDatos2022 = f"""
 deptos_actividad_genero = dd.sql(consultaDatos2022).df()
 
 deptos_actividad_genero.to_excel('exportacion_actividad_genero.xlsx')
+
+#%% Tablas auxialiares, filtradas desde el dataset deptos_actividad_genero
 
 consultaTablaProvincias =   """
                                 SELECT DISTINCT 
