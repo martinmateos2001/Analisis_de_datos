@@ -74,7 +74,9 @@ elimino = f"""
 
 Establecimientos = dd.sql(elimino).df()
 
-Establecimientos.to_excel('Establecimientos_limpio.xlsx')
+
+# Establecimientos.to_excel('Establecimientos_limpio.xlsx')
+
 
 #%% Buscamos la cantidad de establecimientos que hay de cada nivel
 
@@ -241,15 +243,7 @@ consultaTablaDeptos =   """
                         """
 tabla_deptos = dd.sql(consultaTablaDeptos).df()
 
-#Resultado P2
-consultaTotalEmpleados = """
-                            SELECT DISTINCT Provincia, Departamento, COUNT(Empleo) AS 'Cantidad total de empleados en 2022'
-                            FROM deptos_actividad_genero
-                            GROUP BY Provincia, Departamento
-                            ORDER BY Provincia ASC, "Cantidad total de empleados en 2022" DESC;
-                            """
-                            
-empleados_por_departamento = dd.sql(consultaTotalEmpleados).df()
+
 #%% Formo la tabla del punto uno
 
 """
@@ -405,22 +399,36 @@ for k,v in diccJ.items():
     
     uniones=dd.sql(consulta).df()
 
+#%% Resultado P2
+consultaTotalEmpleados = """
+                            SELECT DISTINCT Provincia, Departamento, COUNT(Empleo) AS 'Cantidad total de empleados en 2022'
+                            FROM deptos_actividad_genero
+                            GROUP BY Provincia, Departamento
+                            ORDER BY Provincia ASC, "Cantidad total de empleados en 2022" DESC;
+                            """
+                            
+empleados_por_departamento = dd.sql(consultaTotalEmpleados).df()
+
 #%% Ejercicio 3
 
 ee = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
                                  skiprows=6, usecols= columnas_ee)
 
-# consultaTotalEE =  """
-#                     SELECT DISTINC Jurisdicción, Departamento, COUNT (Departamento)
-#                     FROM ee
-#                     GROUP BY Jurisdicción, Departamento
-#                     WHERE Común='1'
-#                     """
-# total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
+consultaTotalEE =   """
+                    SELECT DISTINCT Jurisdicción AS Provincia, Departamento, SUM(COALESCE(TRY_CAST(TRIM(Común) AS DOUBLE),0)) AS Loquevenga
+                    FROM ee
+                    GROUP BY Provincia, Departamento;
+                    """
+total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
 
 
-
-
+# consultaCantEmpresasExpMujeres =   """
+#                                 SELECT
+#                                     Departamento
+#                                     clae6,
+#                                     Genero,
+#                                     SUM(Genero)
+#                             """
 
 
 
