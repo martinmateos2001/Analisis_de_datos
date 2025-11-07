@@ -8,22 +8,21 @@ Created on Thu Nov  6 10:31:07 2025
 
 import matplotlib.pyplot as plt
 import numpy as np
-import nidaqmx
 import seaborn as sb
 from scipy.signal import find_peaks
-from tqdm import tqdm
 from IPython import get_ipython
 import pandas as pd
 import sklearn as sck
 from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV, StratifiedGroupKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report, f1_score, confusion_matrix
+from sklearn.tree import DecisionTreeClassifier
 
-df_datos = pd.read_csv('/home/Estudiante/Descargas/tp 2 sal/Archivos TP-02-20251106//kuzushiji_full.csv')
+df_datos = pd.read_csv('kuzushiji_full.csv')
 
-df_etiqueta = pd.read_csv('/home/Estudiante/Descargas/tp 2 sal/Archivos TP-02-20251106/kmnist_classmap_char.csv')
+df_etiqueta = pd.read_csv('kmnist_classmap_char.csv')
 
 
 print(len(df_datos))
@@ -380,5 +379,66 @@ print(classification_report(y_test, y_pred))
 print(f"Cantidad de datos usados: {k} ")
 print(f"Cantidad de vecinos usados: {k_neigbors}")
 
-#%%
+#%% Construcción de los datos dev y held out para el decision tree
+
+x= df_datos.drop('label', axis = 1).values
+y = df_datos['label'].values
+
+
+
+x_dev, x_held, y_dev, y_held = train_test_split(x, y, test_size= 0.2, random_state= 42, stratify = y)
+
+
+print("Datos de desarrollo: ", x_dev.shape)
+print("Datos de validacion (held out):", x_held.shape)
+
+#%% Prueba de las distintas profundidades
+
+depths = range(1,11)
+mean_scores = []
+
+for d in depths:
+    tree = DecisionTreeClassifier(max_depth = d, random_state= 42)
+    scores = cross_val_score(tree,x_dev, y_dev, cv=5, scoring = 'accuracy')
+    mean_scores.append(np.mean(scores))
+    
+print(f"Profundidad = {d}, accuracy promedio = {np.mean(scores):.4f}")
+best_depth = depths[np.argmax(mean_scores)]
+print(f"\n Mejor profundidad seleccionada: {best_depth}")
+
+#%% Seleccionamos la mejor profundidad
+
+best_tree = DecisionTreeClassifier(max_depth= best_depth, random_state= 42)
+best_tree.fit(x_dev, y_dev)
+
+
+#%% Visualizamos metricas
+
+y_pred = best_tree.predict(x_held)
+
+
+print("\n reporte de Clasificacion: ")
+print(classification_report(y_held, y_pred))
+cm = confusion_matrix(y_held, y_pred)
+
+print("\n Matriz de confusion: \n", cm)
+
+
+
+#%% Cross validation para comparar
+
+tree = DecisionTreeClassifier(random_state=42)
+param_grid = {'max_depth' : [3,5,7,9,1 ], 'min_samples_split' : [2,5,10], 'min_samples_leaf' : [1,2,4], 'criterion' : ['gini', 'entropy'] }
+
+cv = StratifiedGroupKFold(n_splits= 5, shuffle= True, random_state=42)
+grid_search = GridSearchCV(estimator = tree, param_grid = param_grid, cv=cv, scoring = 'accuracy', n_jobs = -1, verbose = 1)
+
+grid_search.fit(x_dev, y_dev)
+
+print("Mejores parametros encontrados")
+print(grid_search.best_params_)
+print(f"Mejor exactitud promedio en validacion: {grid_search.best_score_:.3f}")
+
+
+
 
