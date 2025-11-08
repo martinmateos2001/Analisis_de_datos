@@ -15,7 +15,7 @@ from IPython import get_ipython
 import pandas as pd
 import sklearn as sck
 from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV, StratifiedGroupKFold
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV, StratifiedGroupKFold, StratifiedKFold
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report, f1_score, confusion_matrix
@@ -420,31 +420,33 @@ rendimientoKNN('Recall')
 
 #%% Construcción de los datos dev y held out para el decision tree
 
-# comento esto porque los valores de x e y no cambian, la pc trabaja de mas :)
-# x= df_datos.drop('label', axis = 1).values
-# y = df_datos['label'].values
-
-
+x = df_datos.drop('label', axis = 1).values
+y = df_datos['label'].values
 
 x_dev, x_held, y_dev, y_held = train_test_split(x, y, test_size= 0.2, random_state= 42, stratify = y)
 
 
 print("Datos de desarrollo: ", x_dev.shape)
 print("Datos de validacion (held out):", x_held.shape)
-
+print("Datos de etiquetas de desarrollo: ", y_dev.shape)
+print("Datos de etiquetas de validación (held out): ", y_held.shape)
 #%% Prueba de las distintas profundidades
 
-depths = range(1,11)
+depths = range(1,11, 2) # 1, 3, 5, 7, 9 para acortar el tiempo de ejecucion.
 mean_scores = []
 
 for d in depths:
     tree = DecisionTreeClassifier(max_depth = d, random_state= 42)
-    scores = cross_val_score(tree,x_dev, y_dev, cv=5, scoring = 'accuracy')
+    scores = cross_val_score(tree,x_dev, y_dev, cv=4, scoring = 'accuracy') # cv=5 -> cv=4
     mean_scores.append(np.mean(scores))
-    
+
+
 print(f"Profundidad = {d}, accuracy promedio = {np.mean(scores):.4f}")
 best_depth = depths[np.argmax(mean_scores)]
 print(f"\n Mejor profundidad seleccionada: {best_depth}")
+
+# El coste era alto ahora tarda mucho menos : ), sigue seleccionando la profundidad mas alta.
+# Por lo menos en mi pc tardo aprox 5min antes de los cambios, ahora son aprox 2
 
 #%% Seleccionamos la mejor profundidad
 
@@ -454,6 +456,18 @@ best_tree.fit(x_dev, y_dev)
 
 #%% Visualizamos metricas
 
+# comparación de rendimiento x max profundidad
+
+plt.figure(figsize=(8,5))
+plt.plot(depths, mean_scores, marker='o', linestyle='-', color='blue')
+plt.title('Precisión promedio vs profundidad del árbol')
+plt.xlabel('Profundidad máxima (max_depth)')
+plt.ylabel('Precisión promedio (accuracy)')
+plt.xticks(depths)
+plt.grid(True)
+plt.show()
+
+# Mejor arbol
 y_pred = best_tree.predict(x_held)
 
 
@@ -461,24 +475,62 @@ print("\n reporte de Clasificacion: ")
 print(classification_report(y_held, y_pred))
 cm = confusion_matrix(y_held, y_pred)
 
-print("\n Matriz de confusion: \n", cm)
+# print("\n Matriz de confusion: \n", cm)
 
-
+#imagen de la matriz
+plt.figure(figsize=(6, 5))
+sb.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('Predicción')
+plt.ylabel('Valor real')
+plt.title('Matriz de confusión')
+plt.show()
 
 #%% Cross validation para comparar
 
 tree = DecisionTreeClassifier(random_state=42)
-param_grid = {'max_depth' : [3,5,7,9,1 ], 'min_samples_split' : [2,5,10], 'min_samples_leaf' : [1,2,4], 'criterion' : ['gini', 'entropy'] }
 
-cv = StratifiedGroupKFold(n_splits= 5, shuffle= True, random_state=42)
-grid_search = GridSearchCV(estimator = tree, param_grid = param_grid, cv=cv, scoring = 'accuracy', n_jobs = -1, verbose = 1)
+param_grid = {
+    'max_depth' : [1,3,5,7,9], 
+    'min_samples_split' : [2,5,10], 
+    'min_samples_leaf' : [2], 
+    'criterion' : ['gini', 'entropy'] }
+
+cv = StratifiedKFold(n_splits= 4, shuffle= True, random_state=42)
+
+grid_search = GridSearchCV(
+    estimator = tree, 
+    param_grid = param_grid, 
+    cv=cv, 
+    scoring = 'accuracy', 
+    n_jobs = -1, 
+    verbose = 1)
 
 grid_search.fit(x_dev, y_dev)
+
+#Guardo los resultados de los árboles
+resultados = pd.DataFrame(grid_search.cv_results_)
 
 print("Mejores parametros encontrados")
 print(grid_search.best_params_)
 print(f"Mejor exactitud promedio en validacion: {grid_search.best_score_:.3f}")
 
+#%% Predicciones
+# Busco el mejor el arbol
+mejor_arbol = grid_search.best_estimator_
 
+# Lo entreno
+mejor_arbol.fit(x_dev, y_dev)
 
+# Predicciones
+y_pred_held = mejor_arbol.predict(x_held)
 
+# Vizualizacion
+
+cm = confusion_matrix(y_held, y_pred_held)
+
+plt.figure(figsize=(6, 5))
+sb.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('Predicción')
+plt.ylabel('Valor real')
+plt.title('Matriz de confusión')
+plt.show()
