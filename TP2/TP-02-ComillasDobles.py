@@ -6,6 +6,7 @@ Created on Thu Nov  6 10:31:07 2025
 @author: Estudiante
 """
 
+#%% Imports y cargamos archivos
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sb
@@ -24,18 +25,19 @@ df_datos = pd.read_csv('kuzushiji_full.csv')
 
 df_etiqueta = pd.read_csv('kmnist_classmap_char.csv')
 
-
+#%% Exploracion dataframes
 print(len(df_datos))
 
 print(len(df_datos.columns))
 
 print(len(df_etiqueta))
 
-primero = df_datos.iloc[55,[i for i in range (784)]]
+# Observamos caracteres
+caracter = df_datos.iloc[55,[i for i in range (784)]]
 
-primero = np.array(primero).reshape((28,28))
+caracter = np.array(caracter).reshape((28,28))
 
-plt.imshow(primero, cmap = 'gray')
+plt.imshow(caracter, cmap = 'gray')
 plt.title("Imagen 56")
 plt.show
 
@@ -256,6 +258,7 @@ plt.title('Mapa de calor de variabilidad por pixel de la clase 9')
 plt.show()
 
 #%% Represenacion por promedio
+
 x= df_datos.drop('label', axis = 1).values
 y = df_datos['label'].values
 
@@ -271,9 +274,6 @@ plt.show()
 
 #%% Representacion PSA
 
-x= df_datos.drop('label', axis = 1).values
-y = df_datos['label'].values
-
 pca = PCA(n_components=2)
 x_pca = pca.fit_transform(x)
 
@@ -283,9 +283,6 @@ plt.title('proyeccion PCA de los caracteres')
 plt.show()
 
 #%% Representacion por medianas
-
-x= df_datos.drop('label', axis = 1).values
-y = df_datos['label'].values
 
 for i in range(10):
     median_img = np.median(x[y == i], axis = 0).reshape(28,28)
@@ -379,10 +376,53 @@ print(classification_report(y_test, y_pred))
 print(f"Cantidad de datos usados: {k} ")
 print(f"Cantidad de vecinos usados: {k_neigbors}")
 
+#%% Comparacion de modelos KNN 
+
+k_vecinos = [1, 3, 5, 7, 9, 11]
+pixeles = [3, 10, 100, 300, 600, 784]
+resultados = []
+
+for p in pixeles:
+    selector = SelectKBest(f_classif, k=p)
+    x_train_sel = selector.fit_transform(x_train, y_train)
+    x_test_sel = selector.transform(x_test)
+    for k in k_vecinos:
+        modelo = KNeighborsClassifier(n_neighbors=k)
+        modelo.fit(x_train_sel, y_train)
+        y_pred = modelo.predict(x_test_sel)
+        
+        acc = accuracy_score(y_test, y_pred)
+        prec = precision_score(y_test, y_pred, average='macro')
+        rec = recall_score(y_test, y_pred, average='macro')
+        
+        resultados.append((p, k, acc, prec, rec))
+
+df_resultados = pd.DataFrame(resultados, columns=['Pixeles', 'Vecinos', 'Accuracy', 'Precision', 'Recall'])
+
+def rendimientoKNN(metrica:str):
+    plt.figure(figsize=(10,6))
+    for k in k_vecinos:
+        subset = df_resultados[df_resultados['Vecinos'] == k]
+        plt.plot(subset['Pixeles'], subset[metrica], marker='o', label=f'k={k}')
+
+    plt.xlabel('Cantidad de atributos seleccionados')
+    plt.ylabel(metrica)
+    plt.title(f'{metrica} según cantidad de atributos y vecinos')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+rendimientoKNN('Accuracy')
+rendimientoKNN('Precision')
+rendimientoKNN('Recall')
+
+
 #%% Construcción de los datos dev y held out para el decision tree
 
-x= df_datos.drop('label', axis = 1).values
-y = df_datos['label'].values
+# comento esto porque los valores de x e y no cambian, la pc trabaja de mas :)
+# x= df_datos.drop('label', axis = 1).values
+# y = df_datos['label'].values
 
 
 
