@@ -42,7 +42,15 @@ plt.title("Imagen 56")
 plt.show
 
 
+conteo_clases = df_datos['label'].value_counts().sort_index()
 
+# Crear gráfico de barras
+plt.bar(conteo_clases.index, conteo_clases.values)
+plt.title("Cantidad de ejemplos por clase")
+plt.xlabel("Clase")
+plt.ylabel("Cantidad de imágenes")
+plt.xticks(range(10))
+plt.show()
 
 #%% Funcion para mapa de calor: Nos quedamos con esto
 
