@@ -225,6 +225,9 @@ for p in pixeles:
 
 df_resultados = pd.DataFrame(resultados, columns=['Pixeles', 'Vecinos', 'Accuracy', 'Precision', 'Recall'])
 
+top3 = df_resultados.nlargest(3, 'Accuracy')
+print(top3)
+
 def rendimientoKNN(metrica:str):
     plt.figure(figsize=(10,6))
     for k in k_vecinos:
@@ -258,11 +261,12 @@ print("Datos de etiquetas de desarrollo: ", y_dev.shape)
 print("Datos de etiquetas de validación (held out): ", y_held.shape)
 #%% Prueba de las distintas profundidades
 
-depths = range(1,11, 2) # 1, 3, 5, 7, 9 para acortar el tiempo de ejecucion.
+depths = [i for i in range(1,9, 2)] + [10] # 1, 3, 5, 7 para acortar el tiempo de ejecucion.
+
 mean_scores = []
 
 for d in depths:
-    tree = DecisionTreeClassifier(max_depth = d, random_state= 42)
+    tree = DecisionTreeClassifier(max_depth = d, random_state= 42, criterion='entropy')
     scores = cross_val_score(tree,x_dev, y_dev, cv=4, scoring = 'accuracy') # cv=5 -> cv=4
     mean_scores.append(np.mean(scores))
 
@@ -282,7 +286,7 @@ best_tree.fit(x_dev, y_dev)
 # Visualizar el arbol
 plt.figure(figsize=(25, 12))
 plot_tree(best_tree, filled=True, max_depth=3, fontsize=8)
-plt.title("Árbol de Decisión con profundidad parcial 3 (Máxima profunidad = 9)")
+plt.title("Árbol de Decisión con profundidad parcial 3 (Máxima profunidad = 10)")
 plt.show()
 #%% Visualizamos metricas
 
@@ -290,9 +294,9 @@ plt.show()
 
 plt.figure(figsize=(8,5))
 plt.plot(depths, mean_scores, marker='o', linestyle='-', color='blue')
-plt.title('Precisión promedio vs profundidad del árbol')
-plt.xlabel('Profundidad máxima (max_depth)')
-plt.ylabel('Precisión promedio (accuracy)')
+plt.title('Exactitud promedio vs profundidad del árbol')
+plt.xlabel(f'Profundidad máxima (10)')
+plt.ylabel('Exactitud promedio (accuracy)')
 plt.xticks(depths)
 plt.grid(True)
 plt.show()
@@ -320,7 +324,7 @@ plt.show()
 tree = DecisionTreeClassifier(random_state=42)
 
 param_grid = {
-    'max_depth' : [1,3,5,7,9], 
+    'max_depth' : depths, 
     'min_samples_split' : [2,5,10], 
     'min_samples_leaf' : [2], 
     'criterion' : ['gini', 'entropy'] }
@@ -344,9 +348,19 @@ print("Mejores parametros encontrados")
 print(grid_search.best_params_)
 print(f"Mejor exactitud promedio en validacion: {grid_search.best_score_:.3f}")
 
+# Mejores parametros encontrados
+# {'criterion': 'entropy', 'max_depth': 10, 'min_samples_leaf': 2, 'min_samples_split': 5}
+# Mejor exactitud promedio en validacion: 0.716
+
 #%% Predicciones
 # Busco el mejor el arbol
 mejor_arbol = grid_search.best_estimator_
+
+# Visualizar el arbol
+plt.figure(figsize=(25, 12))
+plot_tree(mejor_arbol, filled=True, max_depth=3, fontsize=8)
+plt.title("Árbol de Decisión con profundidad parcial 3 (Máxima profunidad = 10)")
+plt.show()
 
 # Lo entreno
 mejor_arbol.fit(x_dev, y_dev)
@@ -354,7 +368,7 @@ mejor_arbol.fit(x_dev, y_dev)
 # Predicciones
 y_pred_held = mejor_arbol.predict(x_held)
 
-# Vizualizacion
+# Vizualizacion matriz de confusion 
 
 cm = confusion_matrix(y_held, y_pred_held)
 
