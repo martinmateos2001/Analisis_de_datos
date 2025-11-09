@@ -19,7 +19,7 @@ from sklearn.model_selection import train_test_split, cross_val_score, GridSearc
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report, f1_score, confusion_matrix
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 
 df_datos = pd.read_csv('kuzushiji_full.csv')
 
@@ -271,7 +271,11 @@ print(f"\n Mejor profundidad seleccionada: {best_depth}")
 best_tree = DecisionTreeClassifier(max_depth= best_depth, random_state= 42)
 best_tree.fit(x_dev, y_dev)
 
-
+# Visualizar el arbol
+plt.figure(figsize=(25, 12))
+plot_tree(best_tree, filled=True, max_depth=3, fontsize=8)
+plt.title("Árbol de Decisión con profundidad parcial 3 (Máxima profunidad = 9)")
+plt.show()
 #%% Visualizamos metricas
 
 # comparación de rendimiento x max profundidad
