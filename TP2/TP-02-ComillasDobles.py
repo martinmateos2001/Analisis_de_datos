@@ -208,7 +208,7 @@ sb.heatmap(pixel_vsr_img, cmap = 'viridis')
 plt.title('Mapa de calor de variabilidad por pixel de la clase 8')
 plt.show()
 
-#%% Funcion para mapa de calor
+#%% Funcion para mapa de calor: Nos quedamos con esto
 
 def mapCalorClase(clase:str):
    y = df_datos.query('label == @clase').drop(columns = ['label']).values
