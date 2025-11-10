@@ -202,10 +202,21 @@ print(classification_report(y_test, y_pred))
 print(f"Cantidad de datos usados: {k} ")
 print(f"Cantidad de vecinos usados: {k_neigbors}")
 
+# matriz de confusion 700 pixeles y 3 vecinos
+cm = confusion_matrix(y_test, y_pred, labels=[4, 5])
+
+plt.figure(figsize=(5,4))
+sb.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+           xticklabels=[4, 5], yticklabels=[4, 5])
+plt.xlabel('Predicción')
+plt.ylabel('Valor real')
+plt.title('Matriz de confusión para 700 atributos (clases 4 y 5)')
+plt.show()
+
 #%% Comparacion de modelos KNN 
 
-k_vecinos = [1, 3, 5, 7, 9, 11]
-pixeles = [3, 10, 100, 300, 600, 784]
+k_vecinos = [3, 5, 7, 9, 11]
+pixeles = [3, 10, 100, 300, 500, 700, 784]
 resultados = []
 
 for p in pixeles:
@@ -245,6 +256,21 @@ def rendimientoKNN(metrica:str):
 rendimientoKNN('Accuracy')
 rendimientoKNN('Precision')
 rendimientoKNN('Recall')
+
+# Visualizamos la matriz de confusion del mejor modelo
+# Reentreno - sabemos los valores del print top 3 que son todos los pixeles y 3 vecinos
+modelo = KNeighborsClassifier(n_neighbors=3)
+modelo.fit(x_train, y_train)
+y_pred = modelo.predict(x_test)
+
+# Matriz de confusión
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 5))
+sb.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=[4, 5], yticklabels=[4, 5])
+plt.xlabel('Predicción')
+plt.ylabel('Valor real')
+plt.title('Matriz de confusión')
+plt.show()
 
 
 #%% Construcción de los datos dev y held out para el decision tree
@@ -295,7 +321,7 @@ plt.show()
 plt.figure(figsize=(8,5))
 plt.plot(depths, mean_scores, marker='o', linestyle='-', color='blue')
 plt.title('Exactitud promedio vs profundidad del árbol')
-plt.xlabel(f'Profundidad máxima (10)')
+plt.xlabel('Profundidad máxima (10)')
 plt.ylabel('Exactitud promedio (accuracy)')
 plt.xticks(depths)
 plt.grid(True)
