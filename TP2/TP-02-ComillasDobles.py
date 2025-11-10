@@ -57,37 +57,6 @@ plt.ylabel("Cantidad de imágenes")
 plt.xticks(range(10))
 plt.show()
 
-#%% Funcion para mapa de calor: Nos quedamos con esto
-
-def mapCalorClase(clase:str):
-   y = df_datos.query('label == @clase').drop(columns = ['label']).values
-   x = df_datos.query('label == @clase').drop(columns = ['label']).values
-
-
-   pixel_varianza = np.var(x/255, axis = 0)
-
-
-   pixel_vsr_img = pixel_varianza.reshape(28,28)
-
-
-   plt.figure(figsize = (6,6))
-   sb.heatmap(pixel_vsr_img, cmap = 'viridis')
-   plt.title(f'Mapa de calor de variabilidad por pixel de la clase {clase}')
-   plt.show()
-   
-
-
-mapCalorClase(0)
-mapCalorClase(1)
-mapCalorClase(2)
-mapCalorClase(3)
-mapCalorClase(4)
-mapCalorClase(5)
-mapCalorClase(6)
-mapCalorClase(7)
-mapCalorClase(8)
-mapCalorClase(9)
-
 #%% Represenacion por promedio
 
 x= df_datos.drop('label', axis = 1).values
