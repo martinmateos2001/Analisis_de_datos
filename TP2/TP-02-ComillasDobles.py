@@ -41,10 +41,10 @@ plt.imshow(caracter, cmap = 'gray')
 plt.title("Imagen 56")
 plt.show
 
+# cuento el numero de datos que pertenecen a cada clase
+conteo_clases = df_datos['label'].value_counts()
 
-conteo_clases = df_datos['label'].value_counts().sort_index()
-
-# Crear gráfico de barras
+# Creo el gráfico de barras
 plt.bar(conteo_clases.index, conteo_clases.values)
 plt.title("Cantidad de ejemplos por clase")
 plt.xlabel("Clase")
