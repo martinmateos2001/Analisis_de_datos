@@ -5,7 +5,12 @@ Created on Thu Nov  6 10:31:07 2025
 
 @author: Estudiante
 """
-
+"""
+Nombre del grupo: "Comillas Dobles"
+Participantes:
+- Martin Mateos
+- Salvador Durand
+"""
 #%% Imports y cargamos archivos
 import matplotlib.pyplot as plt
 import numpy as np
