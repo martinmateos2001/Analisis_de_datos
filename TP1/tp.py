@@ -549,3 +549,16 @@ WHERE e.Empleos > p.Promedio_Empleos
 """
 
 df_punto4 = dd.sql(consulta).df()
+
+# Con esta consulta podria haber dos CLAE3 con el mismo maximo desempato con el clae minimo
+consulta = """
+SELECT
+    Provincia,
+    Departamento,
+    MIN(CLAE3) AS CLAE3,
+    Empleos
+FROM df_punto4
+GROUP BY Provincia, Departamento, Empleos
+""" 
+
+df_punto4 = dd.sql(consulta).df()
