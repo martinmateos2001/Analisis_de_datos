@@ -28,12 +28,7 @@ AA - SNU - INET
 Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
                                  skiprows=6, usecols= columnas_ee)
 
-
-
 #Eliminamos los establecimientos que no son comunes
-
-
-
 
 def upperSinTildes(columna:str)->str:
     
@@ -50,9 +45,11 @@ def upperSinTildes(columna:str)->str:
             """
     return res
 
+
+#Eliminamos Cueanexo
 jur = upperSinTildes("Jurisdicción")
 dep = upperSinTildes("Departamento")
-#Eliminamos Cueanexo
+
 elimino = f"""
             SELECT 
                 REPLACE({jur}, 'CIUDAD DE BUENOS AIRES', 'CABA') as Provincia, 
@@ -68,8 +65,6 @@ elimino = f"""
           """
 
 Establecimientos = dd.sql(elimino).df()
-
-
 Establecimientos.to_excel('Establecimientos_limpio.xlsx')
 
 
@@ -189,7 +184,7 @@ provincia = upperSinTildes("provincia")
 consultaDatos2022 = f"""
                         SELECT 
                             in_departamentos AS Cod_Departamento,
-                            {deptos} AS Departamento,
+                            REPLACE({deptos}, '°', '') AS Departamento,
                             provincia_id AS Id_Provincia,
                             {provincia} AS Provincia,
                             clae6,
@@ -396,21 +391,34 @@ empleados_por_departamento = dd.sql(consultaTotalEmpleados).df()
 ee = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
                                  skiprows=6, usecols= columnas_ee)
 
+"""Explicación de la consulta:
+    Obtenemos la cantidad de establecimientos educativos comunes por departamento.
+    - Borramos espacios en los extremos TRIM.
+    - Los numeros de la columna son Chars así que los convertimos, si no puede hacerlo devuelve null.
+    - COALESCE reemplaza nulls por 0.
+"""
+
 consultaTotalEE =   """
-                    SELECT DISTINCT Jurisdicción AS Provincia, Departamento, SUM(COALESCE(TRY_CAST(TRIM(Común) AS DOUBLE),0)) AS Loquevenga
+                    SELECT DISTINCT 
+                        Jurisdicción AS Provincia, 
+                        Departamento, 
+                        SUM(COALESCE(TRY_CAST(TRIM(Común) AS DOUBLE),0)) AS Cant_EE
                     FROM ee
                     GROUP BY Provincia, Departamento;
                     """
 total_establicimientos_departamento = dd.sql(consultaTotalEE).df()
 
 
-# consultaCantEmpresasExpMujeres =   """
-#                                 SELECT
-#                                     Departamento
-#                                     clae6,
-#                                     Genero,
-#                                     SUM(Genero)
-#                             """
+consultaCantEmpresasExpMujeres =    """
+                                    SELECT
+                                        Provincia,
+                                        Departamento,
+                                        SUM(Exportadoras) AS Cant_Expo_Mujeres
+                                    FROM deptos_actividad_genero
+                                    WHERE Genero = 'MUJERES'
+                                    GROUP BY Provincia, Departamento
+                                    """
+df_cant_expo_mujeres = dd.sql(consultaCantEmpresasExpMujeres).df()
 
 
 
