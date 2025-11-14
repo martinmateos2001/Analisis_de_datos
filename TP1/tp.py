@@ -483,3 +483,69 @@ ON d.Provincia = p.Provincia AND d.Departamento = p.Departamento
 """
 
 df_punto3 = dd.sql(consultaJoin).df()
+
+#%% Punto 4 - Filtro de Deptos con cant_empleados > cant_empleos_provincia
+
+
+consultaPromedio = """
+SELECT
+    Provincia,
+    AVG(Empleo) AS Promedio_Empleos
+FROM deptos_actividad_genero
+GROUP BY Provincia
+"""
+
+consultaEmpleadosPorDepto = """
+SELECT
+    Provincia,
+    Departamento,
+    SUM(Empleo) AS Empleos
+FROM deptos_actividad_genero
+GROUP BY Provincia, Departamento
+"""
+
+consultaClae3 = """
+SELECT
+    Provincia,
+    Departamento,
+    LEFT(LPAD(CAST(clae6 AS VARCHAR), 6, '0'), 3) AS CLAE3,
+    Empleo
+FROM deptos_actividad_genero
+"""
+
+sumaEmpleosClae3 = f"""
+SELECT
+    Provincia,
+    Departamento,
+    CLAE3,
+    SUM(Empleo) AS Empleos
+FROM ({consultaClae3})
+GROUP BY Provincia, Departamento, CLAE3
+"""
+
+consultaMaximosClae3PorDepto = f"""
+SELECT
+    Provincia,
+    Departamento,
+    MAX(Empleos) AS Empleos
+FROM ({sumaEmpleosClae3})
+GROUP BY Provincia, Departamento
+"""
+
+consulta = f"""
+SELECT
+    d.Provincia,
+    d.Departamento,
+    d.CLAE3,
+    d.Empleos
+FROM ({sumaEmpleosClae3}) AS d
+INNER JOIN ({consultaMaximosClae3PorDepto}) AS m
+ON d.Provincia = m.Provincia AND d.Departamento = m.Departamento AND d.Empleos = m.Empleos
+INNER JOIN ({consultaPromedio}) AS p
+ON d.Provincia = p.Provincia
+INNER JOIN ({consultaEmpleadosPorDepto}) AS e
+ON d.Provincia = e.Provincia AND d.Departamento = e.Departamento
+WHERE e.Empleos > p.Promedio_Empleos
+"""
+
+df_punto4 = dd.sql(consulta).df()
