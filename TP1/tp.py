@@ -30,30 +30,28 @@ Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativo
 
 #Eliminamos los establecimientos que no son comunes
 
-def upperSinTildes(columna:str)->str:
+def normalizarColumna(col:str) -> str:
+    res = f"REPLACE(TRIM(UPPER({col})), 'Á', 'A')"
+    res = f"REPLACE({res}, 'É','E')"
+    res = f"REPLACE({res}, 'Í','I')"
+    res = f"REPLACE({res}, 'Ó','O')"
+    res = f"REPLACE({res}, 'Ú','U')"
+    res = f"REPLACE({res}, '§','')"
+    res = f"REPLACE({res}, 'º','')"
+    res = f"REPLACE({res}, '°','')"
+    res = f"REPLACE({res}, 'Ü','U')"
+    res = f"REPLACE({res}, '''','')"
     
-    res = f"""
-            REPLACE(
-                    REPLACE(
-                        REPLACE(
-                            REPLACE(
-                                REPLACE(UPPER({columna}), 'Á', 'A'),
-                            'É', 'E'),
-                        'Í', 'I'),
-                    'Ó', 'O'),
-                'Ú', 'U')
-            """
     return res
 
-
 #Eliminamos Cueanexo
-jur = upperSinTildes("Jurisdicción")
-dep = upperSinTildes("Departamento")
+jur = normalizarColumna("Jurisdicción")
+dep = normalizarColumna("Departamento")
 
 elimino = f"""
             SELECT 
-                REPLACE({jur}, 'CIUDAD DE BUENOS AIRES', 'CABA') as Provincia, 
-                REPLACE({dep},'1§ DE MAYO', '1 DE MAYO') as Departamento, 
+                {jur} as Provincia, 
+                {dep} as Departamento, 
                 "Nivel inicial - Jardín maternal" as Maternal,
                 "Nivel inicial - Jardín de infantes" as Jardin, 
                 Primario, Secundario,
@@ -130,16 +128,16 @@ padron_pob_limpio['Casos'] = casos
 # modifico datos para que coincidan con las otras tablas
 
 
-deptosSinTildes = upperSinTildes("Departamento")
-consultaDeptosSinAcentos =  f"""
+deptos = normalizarColumna("Departamento")
+consultaNormalizarDeptos =  f"""
                                 SELECT 
                                     Cod_Departamento,
-                                    REPLACE({deptosSinTildes}, '1º DE MAYO', '1 DE MAYO') AS Departamento,
+                                    {deptos} AS Departamento,
                                     Edad,
                                     Casos
                                 FROM padron_pob_limpio
                             """
-padron_pob_limpio = dd.sql(consultaDeptosSinAcentos).df()
+padron_pob_limpio = dd.sql(consultaNormalizarDeptos).df()
 
 #%% busco la cantidad de personas que hay respecto a cada nivel educativo
 """
@@ -179,12 +177,12 @@ pob_terciaria_mayor = consultarPobPorRangos(25, 54, 'Poblacion_Terciaria_Mayor')
 deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
 
 #Tambien hay que poner todo en mayusculas y sin acentos.
-deptos = upperSinTildes("departamento")
-provincia = upperSinTildes("provincia")
+deptos = normalizarColumna("departamento")
+provincia = normalizarColumna("provincia")
 consultaDatos2022 = f"""
                         SELECT 
                             in_departamentos AS Cod_Departamento,
-                            REPLACE({deptos}, '°', '') AS Departamento,
+                            {deptos} AS Departamento,
                             provincia_id AS Id_Provincia,
                             {provincia} AS Provincia,
                             clae6,
@@ -398,10 +396,12 @@ ee = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx",
     - COALESCE reemplaza nulls por 0.
 """
 
-consultaTotalEE =   """
+provincias = normalizarColumna("Jurisdicción")
+deptos = normalizarColumna("Departamento")
+consultaTotalEE =   f"""
                     SELECT DISTINCT 
-                        Jurisdicción AS Provincia, 
-                        Departamento, 
+                        {provincias} AS Provincia,
+                        {deptos} AS Departamento,
                         SUM(COALESCE(TRY_CAST(TRIM(Común) AS DOUBLE),0)) AS Cant_EE
                     FROM ee
                     GROUP BY Provincia, Departamento;
@@ -416,9 +416,70 @@ consultaCantEmpresasExpMujeres =    """
                                         SUM(Exportadoras) AS Cant_Expo_Mujeres
                                     FROM deptos_actividad_genero
                                     WHERE Genero = 'MUJERES'
-                                    GROUP BY Provincia, Departamento
+                                    GROUP BY Provincia, Departamento;
                                     """
 df_cant_expo_mujeres = dd.sql(consultaCantEmpresasExpMujeres).df()
 
+"""
+Entonces tengo las tablas de cantidad de empresas exportadoras que emplean mujeres, el total de establecimientos educativos comunes
+y me falta la poblacion total por departamento.
 
+Piden que la tabla se vea:
+Provincia | Departamento | Cant_Expo_Mujeres | Cant_EE | Población
+"""
 
+consultaJoin =  """
+                SELECT 
+                    m.Provincia,
+                    m.Departamento,
+                    m.Cant_Expo_Mujeres,
+                    e.Cant_EE
+                FROM df_cant_expo_mujeres AS m
+                INNER JOIN total_establicimientos_departamento AS e
+                ON m.Provincia = e.Provincia AND m.Departamento = e.Departamento;
+                """
+df_punto3 = dd.sql(consultaJoin).df()
+
+consultaPobDeptos = """
+                    SELECT
+                        Cod_Departamento,
+                        Departamento,
+                        SUM(Casos) AS Poblacion
+                    FROM padron_pob_limpio
+                    GROUP BY Cod_Departamento, Departamento
+                    """
+
+df_pob_deptos = dd.sql(consultaPobDeptos).df()
+
+# Tengo que añadirle a esta tabla la columna de provincias para hacer el join con el df_punto3
+
+consultaAgregoProv = """
+SELECT
+    dp.Provincia,
+    d.Departamento,
+    d.Poblacion
+FROM df_pob_deptos AS d
+INNER JOIN (
+    SELECT
+        d.Cod_Departamento,
+        p.Provincia
+    FROM tabla_deptos AS d
+    INNER JOIN tabla_provincias AS p
+    ON d.Id_Provincia = p.Id_provincia) AS dp
+ON d.Cod_Departamento = dp.Cod_Departamento
+"""
+
+df_pob_deptos = dd.sql(consultaAgregoProv).df()
+
+#Termino de hacer el join final
+
+consultaJoin = """
+SELECT
+    p.*,
+    d.Poblacion
+FROM df_punto3 AS p
+INNER JOIN df_pob_deptos AS d
+ON d.Provincia = p.Provincia AND d.Departamento = p.Departamento
+"""
+
+df_punto3 = dd.sql(consultaJoin).df()
