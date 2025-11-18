@@ -9,6 +9,261 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+#%% Funciones
+def normalizarColumna(col:str) -> str:
+    res = f"REPLACE(TRIM(UPPER({col})), 'Á', 'A')"
+    res = f"REPLACE({res}, 'É','E')"
+    res = f"REPLACE({res}, 'Í','I')"
+    res = f"REPLACE({res}, 'Ó','O')"
+    res = f"REPLACE({res}, 'Ú','U')"
+    res = f"REPLACE({res}, '§','')"
+    res = f"REPLACE({res}, 'º','')"
+    res = f"REPLACE({res}, '°','')"
+    res = f"REPLACE({res}, 'Ü','U')"
+    res = f"REPLACE({res}, '''','')"
+    
+    return res
+def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
+    consulta =  f"""
+                   SELECT Provincia, Departamento, COUNT({nivel}) as {nombreDelCount}
+                   FROM Establecimientos
+                   WHERE {nivel} = '1'
+                   GROUP BY Departamento, Provincia;
+                   """
+    return dd.sql(consulta).df()
+
+def limpiarCodArea(area:str):
+    sacar = 'AREA #'
+    return area.replace(sacar, '')
+
+def consultarPobPorRangos(edad_minima:int, edad_maxima:int, nombre_poblacion:str) -> pd.DataFrame:
+    consulta = f"""
+                SELECT 
+                    Cod_Departamento, Departamento, 
+                    SUM(Casos) as {nombre_poblacion}
+                FROM padron_pob_limpio
+                WHERE Edad >= {edad_minima} AND Edad <= {edad_maxima}
+                GROUP BY Cod_Departamento, Departamento;
+                """
+    return dd.sql(consulta).df()
+
+def agregarColumnaProvincia(nombre_df:str, nombre_col_pob:str):
+    consultaAgregarProvinciaAPoblaciones = f"""
+        SELECT 
+            deptos.Provincia,
+            {nombre_df}.Departamento,
+            {nombre_df}.{nombre_col_pob}
+        FROM {nombre_df}
+        INNER JOIN tabla_deptos_provincia as deptos
+        ON {nombre_df}.Cod_Departamento = deptos.Cod_Departamento;
+        """
+    return dd.sql(consultaAgregarProvinciaAPoblaciones).df()
+
+def join_poblacion_cant(pob:str, col_pob:str, cant:str, col_cant:str):
+    consulta = f"""
+        SELECT 
+            {cant}.Provincia,
+            {cant}.Departamento,
+            {cant}.{col_cant},
+            {pob}.{col_pob}
+        FROM {cant}
+        INNER JOIN {pob}
+        ON {cant}.Departamento = {pob}.Departamento AND {cant}.Provincia = {pob}.Provincia
+        """
+    return dd.sql(consulta).df()
+
+#%% GQM
+"""
+Datos Críticos afectados:
+    - Departamentos
+    - Provincias
+Entre y dentro de las tablas de EE y Departamentos por actividad y Género encontramos tuplas(Provincia, Departamento), escritas de distinta manera.
+Estrategia:
+    1- Agrupar filas por los atributos de calidad.
+    2- Contar la cantidad de dicho atributo
+    3- Identificar diferencias
+"""
+
+columnas_ee = 'A,L,N,U:AA'
+Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
+                                 skiprows=6, usecols= columnas_ee)
+
+deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
+
+# Agrupo y cuento el numero de tuplas
+consulta = """
+SELECT
+    Jurisdicción AS Provincia,
+    Departamento
+FROM Establecimientos
+"""
+ee = dd.sql(consulta).df()
+
+# Veces que aparece cada departamento
+consulta = """
+SELECT
+    Provincia,
+    Departamento,
+    COUNT(Departamento) AS Apariciones
+FROM ee
+GROUP BY Provincia, Departamento
+ORDER BY Apariciones ASC;
+"""
+
+registrosEE = dd.sql(consulta).df()
+
+p = normalizarColumna("Provincia")
+d = normalizarColumna("Departamento")
+
+consulta = f"""
+SELECT
+    {p} AS Provincia,
+    {d} AS Departamento,
+    COUNT(Departamento) AS Apariciones
+FROM ee
+GROUP BY Provincia, Departamento
+ORDER BY Apariciones ASC
+"""
+registrosNormalizados = dd.sql(consulta).df()
+
+# Busco problemas de consistencia por el número de apariciones normalizando las columnas de registrosEE y luego haciendo un join.
+consulta = f"""
+SELECT
+    {p} AS Provincia,
+    {d} AS Departamento,
+    Apariciones
+FROM registrosEE
+"""
+
+registrosEE = dd.sql(consulta).df()
+
+# Hago el join y me quedo solo donde difieren en numero de apariciones.
+consulta = """
+SELECT *
+FROM registrosEE AS r
+FULL JOIN registrosNormalizados AS rn
+ON r.Provincia = rn.Provincia AND r.Departamento = rn.Departamento
+"""
+
+resultados = dd.sql(consulta).df()
+
+
+print("Tamaño de registros:", len(registrosEE))
+print("Tamaño de registros normalizados:", len(registrosNormalizados))
+print("Tamaño de resultados: ", len(resultados))
+
+# Comparaciones.
+# Tamaño de registros: 528
+# Tamaño de registros normalizados: 528
+# Tamaño de resultados:  528
+# Por lo tanto no hay inconsistencias en la escritura dentro del dataset o nuestra normalizacion no la toma en cuenta.
+
+#%% GQM - Repito el proceso para Departamentos por act...
+
+deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
+
+#obtengo datos
+consulta = """
+SELECT
+    provincia AS Provincia,
+    departamento AS Departamento,
+    COUNT(Departamento) AS Apariciones
+FROM deptos_actividad_genero
+WHERE anio = 2022
+GROUP BY Provincia, Departamento
+ORDER BY Apariciones ASC;
+"""
+
+registrosAct = dd.sql(consulta).df()
+
+# Normalizado
+consulta = f"""
+SELECT
+    {p} AS Provincia,
+    {d} AS Departamento,
+    COUNT(Departamento) AS Apariciones
+FROM deptos_actividad_genero
+WHERE anio = 2022
+GROUP BY Provincia, Departamento
+ORDER BY Apariciones ASC;
+"""
+
+registrosActNormalizado = dd.sql(consulta).df()
+
+# Normalizo las columnas para hacer el join
+consulta = f"""
+SELECT
+    {p} AS Provincia,
+    {d} AS Departamento,
+    Apariciones
+FROM registrosAct
+"""
+
+registrosAct = dd.sql(consulta).df()
+
+#join
+consulta = """
+SELECT *
+FROM registrosAct AS r
+FULL JOIN registrosActNormalizado AS rn
+ON r.Provincia = rn.Provincia AND r.Departamento = rn.Departamento
+"""
+
+resultados = dd.sql(consulta).df()
+
+
+print("Tamaño de registros:", len(registrosAct))
+print("Tamaño de registros normalizados:", len(registrosActNormalizado))
+print("Tamaño de resultados: ", len(resultados))
+
+# Comparaciones
+# Tamaño de registros: 527
+# Tamaño de registros normalizados: 527
+# Tamaño de resultados:  527
+
+# Tampoco hay inconsistencias dentro de este df pero sí se ve que se obtuvo un fila menos
+# Entonces busco esta tupla que está de mas o de menos
+
+# Departamentos que están en registrosEE pero no en registrosAct
+diff_EE_Act = """ 
+SELECT Provincia, Departamento
+FROM registrosEE
+EXCEPT
+SELECT Provincia, Departamento
+FROM registrosAct;
+"""
+diff_ee_act = dd.sql(diff_EE_Act).df()
+
+# Departamentos que están en registrosAct pero no en registrosEE
+diff_Act_EE = """
+SELECT Provincia, Departamento
+FROM registrosAct
+EXCEPT
+SELECT Provincia, Departamento
+FROM registrosEE;
+"""
+diff_act_ee = dd.sql(diff_Act_EE).df()
+
+print(len(diff_ee_act), "tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero") #29
+# 29 tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero
+
+print(len(diff_act_ee), "tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE") #28
+# 28 tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE
+
+""" Sigo sin ver cual está de mas o de menos pero pude diferencias en la escritura: 
+        - CABA y CIUDAD... -> se pierden las comunas
+        - GENERAL ... y GRAL ...
+        - OHIGGINS Y O HIGGINS
+        
+"""
+
+p = f"REPLACE({p}, 'CIUDAD DE BUENOS AIRES', 'CABA')"
+
+# Mañana veo como se reduce al arreglar esto. Se achicarian a:
+    # 14 tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero
+    # 13 tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE
+    
+    
 #%%Limpieza del Dataset Establecimientos Educativos
 
 
@@ -31,21 +286,6 @@ Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativo
                                  skiprows=6, usecols= columnas_ee)
 
 #Eliminamos los establecimientos que no son comunes
-
-def normalizarColumna(col:str) -> str:
-    res = f"REPLACE(TRIM(UPPER({col})), 'Á', 'A')"
-    res = f"REPLACE({res}, 'É','E')"
-    res = f"REPLACE({res}, 'Í','I')"
-    res = f"REPLACE({res}, 'Ó','O')"
-    res = f"REPLACE({res}, 'Ú','U')"
-    res = f"REPLACE({res}, '§','')"
-    res = f"REPLACE({res}, 'º','')"
-    res = f"REPLACE({res}, '°','')"
-    res = f"REPLACE({res}, 'Ü','U')"
-    res = f"REPLACE({res}, '''','')"
-    
-    return res
-
 #Eliminamos Cueanexo
 jur = normalizarColumna("Jurisdicción")
 dep = normalizarColumna("Departamento")
@@ -69,16 +309,6 @@ Establecimientos.to_excel('Establecimientos_limpio.xlsx')
 
 
 #%% Buscamos la cantidad de establecimientos Educativos que hay de cada nivel de modalidad común
-
-def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
-    consulta =  f"""
-                   SELECT Provincia, Departamento, COUNT({nivel}) as {nombreDelCount}
-                   FROM Establecimientos
-                   WHERE {nivel} = '1'
-                   GROUP BY Departamento, Provincia;
-                   """
-    return dd.sql(consulta).df()
-
 cant_maternales_depto = consultarCantNivelesPorDepto('Maternal', 'Maternales')
 cant_jardin_depto = consultarCantNivelesPorDepto('Jardin', 'Jardines')
 cant_primaria_depto = consultarCantNivelesPorDepto('Primario', 'Primarios')
@@ -97,9 +327,6 @@ edades = []
 casos = []
 
 
-def limpiarCodArea(area:str):
-    sacar = 'AREA #'
-    return area.replace(sacar, '')
 
 area_actual = ""
 depto_actual = ""
@@ -150,17 +377,6 @@ secundaria es [12, 18]
 secuInet es [12, 19]
 snu y snuInet > 18 años
 """
-def consultarPobPorRangos(edad_minima:int, edad_maxima:int, nombre_poblacion:str) -> pd.DataFrame:
-    consulta = f"""
-                SELECT 
-                    Cod_Departamento, Departamento, 
-                    SUM(Casos) as {nombre_poblacion}
-                FROM padron_pob_limpio
-                WHERE Edad >= {edad_minima} AND Edad <= {edad_maxima}
-                GROUP BY Cod_Departamento, Departamento;
-                """
-    return dd.sql(consulta).df()
-
 #prueba = consultarPobPorRangos(0, 2, "asdf")
 
 
@@ -247,18 +463,6 @@ ON tabla_deptos.Id_Provincia = tabla_provincias.Id_Provincia;
 
 tabla_deptos_provincia = dd.sql(consultaDeptosProvinciaNombre).df()
 
-def agregarColumnaProvincia(nombre_df:str, nombre_col_pob:str):
-    consultaAgregarProvinciaAPoblaciones = f"""
-        SELECT 
-            deptos.Provincia,
-            {nombre_df}.Departamento,
-            {nombre_df}.{nombre_col_pob}
-        FROM {nombre_df}
-        INNER JOIN tabla_deptos_provincia as deptos
-        ON {nombre_df}.Cod_Departamento = deptos.Cod_Departamento;
-        """
-    return dd.sql(consultaAgregarProvinciaAPoblaciones).df()
-
 pob_maternal_depto = agregarColumnaProvincia("pob_maternal_depto", "Poblacion_Maternal")
 pob_jardin_depto = agregarColumnaProvincia("pob_jardin_depto", "Poblacion_Jardin")
 pob_primaria_depto = agregarColumnaProvincia("pob_primaria_depto", "Poblacion_Primaria")
@@ -268,18 +472,6 @@ pob_terciaria_joven = agregarColumnaProvincia("pob_terciaria_joven", "Poblacion_
 pob_terciaria_mayor = agregarColumnaProvincia("pob_terciaria_mayor", "Poblacion_Terciaria_Mayor")
 
 #%%Join de cant establecimientos por nivel por depto y su poblacion
-def join_poblacion_cant(pob:str, col_pob:str, cant:str, col_cant:str):
-    consulta = f"""
-        SELECT 
-            {cant}.Provincia,
-            {cant}.Departamento,
-            {cant}.{col_cant},
-            {pob}.{col_pob}
-        FROM {cant}
-        INNER JOIN {pob}
-        ON {cant}.Departamento = {pob}.Departamento AND {cant}.Provincia = {pob}.Provincia
-        """
-    return dd.sql(consulta).df()
 
 maternalesYpoblacion = join_poblacion_cant("pob_maternal_depto", "Poblacion_Maternal", 
                                              "cant_maternales_depto", "Maternales")
