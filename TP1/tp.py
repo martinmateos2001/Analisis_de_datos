@@ -585,3 +585,47 @@ plt.xlabel("Provincia")
 plt.ylabel("Cantidad de empleados (2022)")
 plt.title("Cantidad de empleados por provincia en 2022")
 
+#%% Armado del dataFrame agrupado para el P2
+
+df_visualizar = uniones
+
+niveles = ["Maternales", "Jardines", "Primarios", "Secundarios", "SecundariosInet", "SNUs_Joven", "SNUs_Mayor","SNUsInet_Joven", "SNUsInet_Mayor" ]
+ee_cols = ["Maternales", "Jardines", "Primarios", "Secundarios", "SecundariosInet", "SNUs", "SNUs", "SNUsInet", "SNUsInet" ]
+pop_cols = ["Poblacion_Maternal", "Poblacion_Jardin", "Poblacion_Primaria", "Poblacion_Secundaria", "Poblacion_Secundaria_Inet", "Poblacion_Terciaria_Joven", "Poblacion_Terciaria_Mayor", "Poblacion_Terciaria_Joven", "Poblacion_Terciaria_Mayor"  ]
+
+df_agrupado = pd.DataFrame()
+
+for i in range(len(niveles)):
+    nivel = niveles[i]
+    ee_col = ee_cols[i]
+    pop_col = pop_cols[i]
+
+    temp = df_visualizar[["Departamento", "Provincia", ee_col, pop_col]].copy()
+    temp.columns = ["Departamento", "Provincia", "CantidadEE", "PoblacionGrupoEtario"]
+    temp["NivelEducativo"] = nivel
+
+    df_agrupado = pd.concat([df_agrupado, temp], ignore_index=True)
+    
+#%% Visualizacion del P2
+
+plt.figure(figsize=(12,7))
+sns.scatterplot(
+    data=df_agrupado,
+    x="PoblacionGrupoEtario",
+    y="CantidadEE",
+    hue="NivelEducativo",       # colores por nivel
+    palette="tab10",
+    alpha=0.6,
+    s=80                        # tamaño de los puntos
+)
+
+plt.xscale("log")
+# Etiquetas y título
+plt.xlabel("Población del grupo etario (escala log)")
+plt.ylabel("Cantidad de EE")
+plt.title("Relación entre población y cantidad de EE por nivel educativo")
+
+
+plt.tight_layout()
+plt.show()
+
