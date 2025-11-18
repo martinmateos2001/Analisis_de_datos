@@ -6,6 +6,7 @@
 import pandas as pd
 import duckdb as dd
 import numpy as np
+import matplotlib.pyplot as plt
 
 #%%Limpieza del Dataset Establecimientos Educativos
 
@@ -562,3 +563,25 @@ GROUP BY Provincia, Departamento, Empleos
 """ 
 
 df_punto4 = dd.sql(consulta).df()
+
+#%% Vizualizacion P1
+
+# Empleados por provincia
+consulta = """
+SELECT 
+    Provincia,
+    SUM(Empleo) AS Empleados
+FROM deptos_actividad_genero
+GROUP BY Provincia
+ORDER BY SUM(Empleo) DESC
+"""
+
+df_empleados_provincia = dd.sql(consulta).df()
+
+plt.figure(figsize=(10,6))
+plt.bar(df_empleados_provincia['Provincia'], df_empleados_provincia['Empleados'])
+plt.xticks(rotation=90)  
+plt.xlabel("Provincia")
+plt.ylabel("Cantidad de empleados (2022)")
+plt.title("Cantidad de empleados por provincia en 2022")
+
