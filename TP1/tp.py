@@ -7,6 +7,7 @@ import pandas as pd
 import duckdb as dd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 #%%Limpieza del Dataset Establecimientos Educativos
 
