@@ -21,6 +21,7 @@ def normalizarColumna(col:str) -> str:
     res = f"REPLACE({res}, '°','')"
     res = f"REPLACE({res}, 'Ü','U')"
     res = f"REPLACE({res}, '''','')"
+    # res = f"REPLACE({res},'.', '')"
     
     return res
 def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
@@ -225,45 +226,59 @@ print("Tamaño de resultados: ", len(resultados))
 # Entonces busco esta tupla que está de mas o de menos
 
 # Departamentos que están en registrosEE pero no en registrosAct
-diff_EE_Act = """ 
+consulta_diff_EE_Act = """ 
 SELECT Provincia, Departamento
 FROM registrosEE
 EXCEPT
 SELECT Provincia, Departamento
 FROM registrosAct;
 """
-diff_ee_act = dd.sql(diff_EE_Act).df()
+diff_EE_Act = dd.sql(consulta_diff_EE_Act).df()
 
 # Departamentos que están en registrosAct pero no en registrosEE
-diff_Act_EE = """
+consulta_diff_Act_EE = """
 SELECT Provincia, Departamento
 FROM registrosAct
 EXCEPT
 SELECT Provincia, Departamento
 FROM registrosEE;
 """
-diff_act_ee = dd.sql(diff_Act_EE).df()
+diff_Act_EE = dd.sql(consulta_diff_Act_EE).df()
 
-print(len(diff_ee_act), "tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero") #29
+print(len(diff_EE_Act), "tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero") #29
 # 29 tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero
 
-print(len(diff_act_ee), "tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE") #28
+print(len(diff_Act_EE), "tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE") #28
 # 28 tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE
 
 """ Sigo sin ver cual está de mas o de menos pero pude diferencias en la escritura: 
         - CABA y CIUDAD... -> se pierden las comunas
         - GENERAL ... y GRAL ...
         - OHIGGINS Y O HIGGINS
-        
+        - hay un nombre que lleva punto (.)
+
+El total de datos (tuplas)
 """
+#%% GQM - Metricas
+cantEE = len(registrosEE)
+unicosEE = len(diff_EE_Act)
+cantAct = len(registrosAct)
+unicosAct = len(diff_Act_EE)
+coincidencias = cantEE - unicosEE   # tambien pueden caluclar a partir de registrosAct
+union = cantEE + cantAct - coincidencias
 
-p = f"REPLACE({p}, 'CIUDAD DE BUENOS AIRES', 'CABA')"
 
-# Mañana veo como se reduce al arreglar esto. Se achicarian a:
-    # 14 tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero
-    # 13 tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE
-    
-    
+jacard = round((coincidencias / union)*100, 2)
+print("Los datasets coinciden en un", round(jacard*100,2), "% por indice de jaccard.")
+
+coincidenciaEEvsAct = round((coincidencias/cantEE)*100,2)
+print("El dataset de Establecimientos edcuativos coincide en un " + str(coincidenciaEEvsAct) + "% sobre el dataset Departamentos Actividad Genero")
+
+coincidenciaActVsEE = round((coincidencias/cantAct)*100, 2)
+print("El dataset de Departamentos Actividad Genero coincide en un " + str(coincidenciaActVsEE) + "% sobre el dataset Establecimientos edcuativos")
+
+diffSimetrica = round(((unicosAct + unicosEE)/ union)*100, 2)
+print("La perdida de informacion sobre pares provincia, departamento es del " + str(diffSimetrica) + "%")
 #%%Limpieza del Dataset Establecimientos Educativos
 
 
