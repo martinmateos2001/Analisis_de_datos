@@ -269,16 +269,16 @@ union = cantEE + cantAct - coincidencias
 
 
 jacard = round((coincidencias / union)*100, 2)
-print("Los datasets coinciden en un", round(jacard*100,2), "% por indice de jaccard.")
+print("Los atributos coinciden en un", jacard, "% por indice de jaccard.")
 
 coincidenciaEEvsAct = round((coincidencias/cantEE)*100,2)
-print("El dataset de Establecimientos edcuativos coincide en un " + str(coincidenciaEEvsAct) + "% sobre el dataset Departamentos Actividad Genero")
+print("Los atributos de Establecimientos edcuativos coinciden en un " + str(coincidenciaEEvsAct) + "% sobre dataset Departamentos Actividad Genero")
 
 coincidenciaActVsEE = round((coincidencias/cantAct)*100, 2)
-print("El dataset de Departamentos Actividad Genero coincide en un " + str(coincidenciaActVsEE) + "% sobre el dataset Establecimientos edcuativos")
+print("Los atributos de Departamentos Actividad Genero coinciden en un " + str(coincidenciaActVsEE) + "% sobre dataset Establecimientos edcuativos")
 
 diffSimetrica = round(((unicosAct + unicosEE)/ union)*100, 2)
-print("La perdida de informacion sobre pares provincia, departamento es del " + str(diffSimetrica) + "%")
+print("La perdida atributos sobre pares provincia, departamento es del " + str(diffSimetrica) + "%")
 #%%Limpieza del Dataset Establecimientos Educativos
 
 
