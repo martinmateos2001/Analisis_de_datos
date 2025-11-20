@@ -1071,21 +1071,27 @@ GROUP BY Provincia, Departamento
 """
 df_ee = dd.sql(consultaEE).df()
 
-consultaEP = """
-SELECT
-    d.Provincia,
-    d.Departamento,
-    SUM(m.Establecimientos) AS Cant_EP
-FROM deptos_actividad_genero AS d
-INNER JOIN (SELECT Provincia, Departamento, MAX(Establecimientos) AS Establecimientos
-    FROM deptos_actividad_genero
-    GROUP BY Provincia, Departamento) AS m
-ON d.Provincia = m.Provincia AND d.Departamento = m.Departamento
-GROUP BY d.Provincia, d.Departamento
+consultaMaximosEP = """
+SELECT 
+    Provincia,
+    Departamento,
+    clae6,
+    MAX(Establecimientos) AS Cant_EP
+FROM deptos_actividad_genero
+GROUP BY Provincia, Departamento, clae6
 """
-df_ep = dd.sql(consultaEP).df()
+df_ep = dd.sql(consultaMaximosEP).df()
 
+consultaEPs = """
+SELECT
+    Provincia,
+    Departamento,
+    SUM(Cant_EP) AS Cant_EP
+FROM df_ep
+GROUP BY Provincia, Departamento
+"""
 
+df_ep = dd.sql(consultaEPs).df()
 
 consultaJoin = """
 SELECT 
@@ -1278,7 +1284,51 @@ plt.tight_layout()
 plt.show()
 
 
+#%%
+
+consulta ="""
+SELECT *
+FROM est_ee_ep
+WHERE Provincia = 'CABA'
+"""
+comunas = dd.sql(consulta).df()
 
 
 
+# lista de provincias en orden estable
+provincias = sorted(comunas['Provincia'].unique())
 
+# generamos una paleta perceptualmente uniforme
+palette = sns.color_palette("husl", len(provincias))
+
+# mapeo provincia → color distinto
+color_map = {prov: palette[i] for i, prov in enumerate(provincias)}
+
+plt.figure(figsize=(12, 7))
+
+sns.scatterplot(
+    data=comunas,
+    x='Cant_EE',
+    y='Cant_EP',
+    hue='Provincia',
+    palette=color_map,
+    size='Poblacion',
+    sizes=(20, 800),
+    alpha=0.7
+)
+
+plt.yscale('log')
+plt.xlabel('Cantidad de Establecimientos Educativos')
+plt.ylabel('Cantidad de Establecimientos Productivos')
+plt.title('Bubble Chart: Educación vs Producción por departamento')
+plt.grid(alpha=0.3)
+
+plt.legend(
+    title='Provincia',
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    fontsize=8
+)
+
+plt.tight_layout()
+plt.show()
