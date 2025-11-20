@@ -949,7 +949,8 @@ sns.scatterplot(
     s=30,
     alpha=0.5)
 
-
+plt.xlim(0, 1000)
+plt.yscale('log')
 plt.xlabel('Empleados cada 1000 habitantes')
 plt.ylabel('EE cada 1000 habitantes')
 plt.title('Relación entre empleo y establecimientos educativos por departamento')
@@ -1058,7 +1059,32 @@ plt.ylabel('Proporción de empleo femenino')
 plt.tight_layout()
 plt.show()
 
+#%% Referencias de cada clae
+referencias = pd.read_csv('actividades_establecimientos.csv')
 
+# Selecciono clae6 y la descripicion del mismo
+desc = normalizarColumna('clae6_desc')
+consulta= f''' 
+SELECT 
+    clae6,
+    {desc} AS desc
+FROM referencias
+'''
+
+referencias = dd.sql(consulta).df()
+
+consultaJoinDesc = """
+SELECT
+    d.clae6,
+    r.desc,
+    d.Proporcion_Mujeres
+FROM df_p5 AS d
+INNER JOIN referencias AS r
+ON r.clae6 = d.clae6
+ORDER BY d.Proporcion_Mujeres DESC
+"""
+
+referencias = dd.sql(consultaJoinDesc).df()
 
 #%% Conclusion - numero de EE es proporcional al numero de EP
 consultaEE = """
@@ -1284,7 +1310,7 @@ plt.tight_layout()
 plt.show()
 
 
-#%%
+#%% Las comunas parecen outliers las visualizamos
 
 consulta ="""
 SELECT *
