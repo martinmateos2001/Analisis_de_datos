@@ -76,212 +76,476 @@ def join_poblacion_cant(pob:str, col_pob:str, cant:str, col_cant:str):
         """
     return dd.sql(consulta).df()
 
-#%% GQM
-"""
-Datos Críticos afectados:
-    - Departamentos
-    - Provincias
-Entre y dentro de las tablas de EE y Departamentos por actividad y Género encontramos tuplas(Provincia, Departamento), escritas de distinta manera.
-Estrategia:
-    1- Agrupar filas por los atributos de calidad.
-    2- Contar la cantidad de dicho atributo
-    3- Identificar diferencias
-"""
+#%% CArga de datos
 
 columnas_ee = 'A,L,N,U:AA'
-Establecimientos = pd.read_excel("2022_padron_oficial_establecimientos_educativos.xlsx", 
+
+"""
+A - Jurisdiccion
+L - Departamento
+N - Común
+U - Jardin maternal
+V - Jardin de infantes
+W - Primario
+X - Secundario
+Y - Secundario - INET
+Z - SNU
+AA - SNU - INET
+"""
+
+Establecimientos_metricas = pd.read_excel('C:/Users/ADMIN/Downloads/tpDatos1//2022_padron_oficial_establecimientos_educativos.xlsx', 
                                  skiprows=6, usecols= columnas_ee)
 
-deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
+deptos_actividad_genero_metricas = pd.read_csv('C:/Users/ADMIN/Downloads/tpDatos1//Datos_por_departamento_actividad_y_sexo.csv')
 
-# Agrupo y cuento el numero de tuplas
-consulta = """
-SELECT
-    Jurisdicción AS Provincia,
-    Departamento
-FROM Establecimientos
-"""
-ee = dd.sql(consulta).df()
+deptos_actividad_genero_metricas.to_excel('exportacion_actividad_genero_metricas_again.xlsx')
 
-# Veces que aparece cada departamento
-consulta = """
-SELECT
-    Provincia,
-    Departamento,
-    COUNT(Departamento) AS Apariciones
-FROM ee
-GROUP BY Provincia, Departamento
-ORDER BY Apariciones ASC;
-"""
+jur = normalizarColumna("Jurisdicción")
+dep = normalizarColumna("Departamento")
 
-registrosEE = dd.sql(consulta).df()
+limpio_metricas = f"""
+            SELECT 
+                {jur} as Provincia, 
+                {dep} as Departamento,
+                
+            FROM Establecimientos_metricas
+            WHERE Común = '1';
+          """
 
-p = normalizarColumna("Provincia")
-d = normalizarColumna("Departamento")
-
-consulta = f"""
-SELECT
-    {p} AS Provincia,
-    {d} AS Departamento,
-    COUNT(Departamento) AS Apariciones
-FROM ee
-GROUP BY Provincia, Departamento
-ORDER BY Apariciones ASC
-"""
-registrosNormalizados = dd.sql(consulta).df()
-
-# Busco problemas de consistencia por el número de apariciones normalizando las columnas de registrosEE y luego haciendo un join.
-consulta = f"""
-SELECT
-    {p} AS Provincia,
-    {d} AS Departamento,
-    Apariciones
-FROM registrosEE
-"""
-
-registrosEE = dd.sql(consulta).df()
-
-# Hago el join y me quedo solo donde difieren en numero de apariciones.
-consulta = """
-SELECT *
-FROM registrosEE AS r
-FULL JOIN registrosNormalizados AS rn
-ON r.Provincia = rn.Provincia AND r.Departamento = rn.Departamento
-"""
-
-resultados = dd.sql(consulta).df()
+Establecimientos_metricas_limpio = dd.sql(limpio_metricas).df()
 
 
-print("Tamaño de registros:", len(registrosEE))
-print("Tamaño de registros normalizados:", len(registrosNormalizados))
-print("Tamaño de resultados: ", len(resultados))
+deptos = normalizarColumna("departamento")
+provincia = normalizarColumna("provincia")
+#id_dep = normalizarColumna("in_departamentos")
+limpio_metricas_ag = f"""
+                        SELECT 
+                            {deptos} AS Departamento,
+                            {provincia} AS Provincia,
+                            in_departamentos AS id_dep,
+                        FROM deptos_actividad_genero_metricas
+                        WHERE anio = '2022';
+                    """
 
-# Comparaciones.
-# Tamaño de registros: 528
-# Tamaño de registros normalizados: 528
-# Tamaño de resultados:  528
-# Por lo tanto no hay inconsistencias en la escritura dentro del dataset o nuestra normalizacion no la toma en cuenta.
+deptos_actividad_genero_metricas_limpio = dd.sql(limpio_metricas_ag).df()
 
-#%% GQM - Repito el proceso para Departamentos por act...
+deptos_actividad_genero_metricas_limpio.to_excel('exportacion_actividad_genero_metricas.xlsx')
 
-deptos_actividad_genero = pd.read_csv('Datos_por_departamento_actividad_y_sexo.csv')
+#%% consulta de SQL
+consulta_pares_ee =  f"""
+               SELECT COUNT (DISTINCT (CONCAT( Provincia, '-', Departamento)))  AS pares
+               FROM Establecimientos_metricas_limpio;
+               
+               """
+pares_ee = dd.sql(consulta_pares_ee).df()
 
-#obtengo datos
-consulta = """
-SELECT
-    provincia AS Provincia,
-    departamento AS Departamento,
-    COUNT(Departamento) AS Apariciones
-FROM deptos_actividad_genero
-WHERE anio = 2022
-GROUP BY Provincia, Departamento
-ORDER BY Apariciones ASC;
-"""
+#resultado = 527
 
-registrosAct = dd.sql(consulta).df()
+consulta_pares_ag =  f"""
+               SELECT COUNT (DISTINCT (CONCAT(provincia, '-', departamento)))  AS pares
+               FROM deptos_actividad_genero_metricas_limpio;
+               
+               """
+pares_ag = dd.sql(consulta_pares_ag).df()
 
-# Normalizado
-consulta = f"""
-SELECT
-    {p} AS Provincia,
-    {d} AS Departamento,
-    COUNT(Departamento) AS Apariciones
-FROM deptos_actividad_genero
-WHERE anio = 2022
-GROUP BY Provincia, Departamento
-ORDER BY Apariciones ASC;
-"""
-
-registrosActNormalizado = dd.sql(consulta).df()
-
-# Normalizo las columnas para hacer el join
-consulta = f"""
-SELECT
-    {p} AS Provincia,
-    {d} AS Departamento,
-    Apariciones
-FROM registrosAct
-"""
-
-registrosAct = dd.sql(consulta).df()
-
-#join
-consulta = """
-SELECT *
-FROM registrosAct AS r
-FULL JOIN registrosActNormalizado AS rn
-ON r.Provincia = rn.Provincia AND r.Departamento = rn.Departamento
-"""
-
-resultados = dd.sql(consulta).df()
+#resultado = 527
 
 
-print("Tamaño de registros:", len(registrosAct))
-print("Tamaño de registros normalizados:", len(registrosActNormalizado))
-print("Tamaño de resultados: ", len(resultados))
+#%% Padron poblacional limpio
 
-# Comparaciones
-# Tamaño de registros: 527
-# Tamaño de registros normalizados: 527
-# Tamaño de resultados:  527
+padron_poblacional = pd.read_excel('C:/Users/ADMIN/Downloads/tpDatos1//padron_poblacion.xlsX', skiprows=12, header=None)
 
-# Tampoco hay inconsistencias dentro de este df pero sí se ve que se obtuvo un fila menos
-# Entonces busco esta tupla que está de mas o de menos
-
-# Departamentos que están en registrosEE pero no en registrosAct
-consulta_diff_EE_Act = """ 
-SELECT Provincia, Departamento
-FROM registrosEE
-EXCEPT
-SELECT Provincia, Departamento
-FROM registrosAct;
-"""
-diff_EE_Act = dd.sql(consulta_diff_EE_Act).df()
-
-# Departamentos que están en registrosAct pero no en registrosEE
-consulta_diff_Act_EE = """
-SELECT Provincia, Departamento
-FROM registrosAct
-EXCEPT
-SELECT Provincia, Departamento
-FROM registrosEE;
-"""
-diff_Act_EE = dd.sql(consulta_diff_Act_EE).df()
-
-print(len(diff_EE_Act), "tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero") #29
-# 29 tuplas aparecen en la tabla de EE pero no en la tabla de Actividad y Genero
-
-print(len(diff_Act_EE), "tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE") #28
-# 28 tuplas aparece en tabla de Actividad y Genero pero no en la tabla de EE
-
-""" Sigo sin ver cual está de mas o de menos pero pude diferencias en la escritura: 
-        - CABA y CIUDAD... -> se pierden las comunas
-        - GENERAL ... y GRAL ...
-        - OHIGGINS Y O HIGGINS
-        - hay un nombre que lleva punto (.)
-
-El total de datos (tuplas)
-"""
-#%% GQM - Metricas
-cantEE = len(registrosEE)
-unicosEE = len(diff_EE_Act)
-cantAct = len(registrosAct)
-unicosAct = len(diff_Act_EE)
-coincidencias = cantEE - unicosEE   # tambien pueden caluclar a partir de registrosAct
-union = cantEE + cantAct - coincidencias
+padron_pob_limpio = pd.DataFrame(columns=['Cod_Departamento', 'Departamento', 'Edad', 'Casos'])
+areas = []
+deptos = []
+edades = []
+casos = []
 
 
-jacard = round((coincidencias / union)*100, 2)
-print("Los atributos coinciden en un", jacard, "% por indice de jaccard.")
+def limpiarCodArea(area:str):
+    sacar = 'AREA #'
+    return area.replace(sacar, '')
 
-coincidenciaEEvsAct = round((coincidencias/cantEE)*100,2)
-print("Los atributos de Establecimientos edcuativos coinciden en un " + str(coincidenciaEEvsAct) + "% sobre dataset Departamentos Actividad Genero")
+area_actual = ""
+depto_actual = ""
+for index, row in padron_poblacional.iterrows():
+    primera_celda = str(row[1])
+    segunda_celda = str(row[2])
+    if (pd.notnull(row[1])):
+        primera_celda = primera_celda.strip()
+        segunda_celda = segunda_celda.strip()
+        if ("AREA" in primera_celda):
+            area_actual= limpiarCodArea(primera_celda)
+            depto_actual =  segunda_celda
+        elif (primera_celda.isdigit()):
+            areas.append(area_actual)
+            deptos.append(depto_actual)
+            edades.append(int(primera_celda))
+            casos.append(int(segunda_celda))
+        elif ("RESUMEN" in primera_celda):
+            break
 
-coincidenciaActVsEE = round((coincidencias/cantAct)*100, 2)
-print("Los atributos de Departamentos Actividad Genero coinciden en un " + str(coincidenciaActVsEE) + "% sobre dataset Establecimientos edcuativos")
+            
 
-diffSimetrica = round(((unicosAct + unicosEE)/ union)*100, 2)
-print("La perdida atributos sobre pares provincia, departamento es del " + str(diffSimetrica) + "%")
+padron_pob_limpio['Cod_Departamento'] = areas
+padron_pob_limpio['Departamento'] = deptos
+padron_pob_limpio['Edad'] = edades
+padron_pob_limpio['Casos'] = casos
+
+# modifico datos para que coincidan con las otras tablas
+
+
+deptos = normalizarColumna("Departamento")
+consultaNormalizarDeptos =  f"""
+                                SELECT 
+                                    Cod_Departamento,
+                                    {deptos} AS Departamento,
+                                    Edad,
+                                    Casos
+                                FROM padron_pob_limpio
+                            """
+padron_pob_limpio_metrica = dd.sql(consultaNormalizarDeptos).df()
+
+#%%
+
+consulta_pares_pob =  f"""
+               SELECT COUNT (DISTINCT (CONCAT( Cod_Departamento, '-', Departamento)))  AS pares
+               FROM padron_pob_limpio_metrica;
+               
+               """
+pares_pob = dd.sql(consulta_pares_pob).df()
+
+#El resultado fue de 527
+#El total en las otras tablas es de 527
+
+
+#%%
+
+consulta_interseccion = f"""
+                        SELECT COUNT(*) AS pares_comunes
+                        FROM (
+                            SELECT DISTINCT (CONCAT(Provincia, '-', Departamento)) AS par_ee
+                            FROM Establecimientos_metricas_limpio
+                        ) AS ee
+                        INNER JOIN (
+                            SELECT DISTINCT (CONCAT(provincia, '-', departamento)) AS par_ag
+                            FROM deptos_actividad_genero_metricas_limpio
+                        ) AS ag
+                        ON ee.par_ee = ag.par_ag;
+                        """
+
+#resultado sin limpieza fue de 300
+#resultado con limpieza 498
+#resultado con limpieza de CIUDAD DE BUENOS AIRES = 513
+interseccion = dd.sql(consulta_interseccion).df()
+
+#%%
+
+# Exclusivos EE
+consulta_diferentes_ee = f"""
+                            SELECT *
+                            FROM (
+                                SELECT DISTINCT Provincia, Departamento
+                                FROM Establecimientos_metricas_limpio
+                            ) AS ee
+                            LEFT JOIN (
+                                SELECT DISTINCT provincia, departamento
+                                FROM deptos_actividad_genero_metricas_limpio
+                            )  AS ag
+                            ON ee.Provincia = ag.provincia
+                            AND ee.Departamento = ag.departamento
+                            WHERE ag.provincia IS NULL;
+                            """
+                            
+diferentes_ee = dd.sql(consulta_diferentes_ee).df()
+#resultado con la primera limpieza fue de 29
+
+#El resultado cae a 14 valores distintos y ahora se pueden registrar
+
+# Exclusivos AG
+
+consulta_diferentes_ag = f"""
+                            SELECT *
+                            FROM (
+                                SELECT DISTINCT provincia, departamento
+                                FROM deptos_actividad_genero_metricas_limpio
+                            ) AS ag
+                            LEFT JOIN (
+                                SELECT DISTINCT Provincia, Departamento
+                                FROM Establecimientos_metricas_limpio
+                            )  AS ee
+                            ON ee.Provincia = ag.provincia
+                            AND ee.Departamento = ag.departamento
+                            WHERE ee.Provincia IS NULL;
+                            """
+diferentes_ag = dd.sql(consulta_diferentes_ag).df()
+
+
+#Tambien arroja 14 valores distintos
+#%%
+
+consulta_distintos_ag  = f"""     
+                            SELECT id_dep, COUNT(DISTINCT Departamento) AS variantes,
+                            FROM deptos_actividad_genero_metricas_limpio,
+                            GROUP BY id_dep,
+                            HAVING COUNT(DISTINCT Departamento) > 1;
+
+                            """
+diferentes_ag_nuevo = dd.sql(consulta_distintos_ag).df()
+
+
+
+#Resultado: No hay problemas de instancia ni de calidad en este dataset.
+
+#%% Graficos
+
+
+# Datos de las tres etapas
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+
+# Coincidencias de pares únicos
+coincidencias = [300, 498, 513]
+
+# Métricas de calidad
+jaccard = [56.0, 89.6, 97.3]  # en %
+diferencia = [44.0, 10.4, 5.3]  # en %
+
+# Crear DataFrame para seaborn
+df_metricas = pd.DataFrame({
+    "Etapa": etapas,
+    "Coincidencias": coincidencias,
+    "Jaccard (%)": jaccard,
+    "Diferencia simétrica (%)": diferencia
+})
+
+# --- Gráfico 1: Coincidencias de pares únicos ---
+plt.figure(figsize=(8,5))
+sns.barplot(x="Etapa", y="Coincidencias", data=df_metricas, palette="Blues")
+plt.title("Coincidencias de pares únicos en cada etapa")
+plt.ylabel("Número de coincidencias")
+plt.xlabel("Etapa")
+plt.show()
+
+# --- Gráfico 2: Jaccard vs Diferencia simétrica ---
+plt.figure(figsize=(8,5))
+df_melt = df_metricas.melt(id_vars="Etapa", value_vars=["Jaccard (%)", "Diferencia simétrica (%)"],
+                           var_name="Métrica", value_name="Valor")
+sns.barplot(x="Etapa", y="Valor", hue="Métrica", data=df_melt, palette="Set2")
+plt.title("Comparación de métricas de calidad en cada etapa")
+plt.ylabel("Porcentaje (%)")
+plt.xlabel("Etapa")
+plt.legend(title="Métrica")
+plt.show()
+
+
+#%% graficos prueba 2
+
+# Datos de las tres etapas
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+
+# Coincidencias de pares únicos
+coincidencias = [300, 498, 513]
+
+# Métricas de calidad
+jaccard = [56.0, 89.6, 97.3]  # en %
+diferencia = [44.0, 10.4, 5.3]  # en %
+
+# Crear DataFrame
+df_metricas = pd.DataFrame({
+    "Etapa": etapas,
+    "Coincidencias": coincidencias,
+    "Jaccard (%)": jaccard,
+    "Diferencia simétrica (%)": diferencia
+})
+
+# --- Gráfico 1: Coincidencias de pares únicos ---
+plt.figure(figsize=(8,5))
+ax1 = sns.barplot(x="Etapa", y="Coincidencias", data=df_metricas, palette="Blues")
+
+# Etiquetas arriba de cada barra
+ax1.bar_label(ax1.containers[0])
+
+plt.title("Coincidencias de pares únicos en cada etapa")
+plt.ylabel("Número de coincidencias")
+plt.xlabel("Etapa")
+plt.show()
+
+# --- Gráfico 2: Jaccard vs Diferencia simétrica ---
+df_melt = df_metricas.melt(id_vars="Etapa",
+                           value_vars=["Jaccard (%)", "Diferencia simétrica (%)"],
+                           var_name="Métrica", value_name="Valor")
+
+plt.figure(figsize=(8,5))
+ax2 = sns.barplot(x="Etapa", y="Valor", hue="Métrica", data=df_melt, palette="Set2")
+
+# Etiquetas arriba de cada barra (para cada grupo de barras)
+for container in ax2.containers:
+    ax2.bar_label(container)
+
+plt.title("Comparación de métricas de calidad en cada etapa")
+plt.ylabel("Porcentaje (%)")
+plt.xlabel("Etapa")
+plt.legend(title="Métrica")
+plt.show()
+
+#%% graficos prueba 3
+
+
+# Datos
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+coincidencias = [300, 498, 513]
+jaccard = [56.0, 89.6, 97.3]
+diferencia = [44.0, 10.4, 5.3]
+
+df_metricas = pd.DataFrame({
+    "Etapa": etapas,
+    "Coincidencias": coincidencias,
+    "Jaccard (%)": jaccard,
+    "Diferencia simétrica (%)": diferencia
+})
+
+# --- Gráfico 1: Coincidencias ---
+plt.figure(figsize=(8,5))
+ax1 = sns.barplot(x="Etapa", y="Coincidencias", data=df_metricas, palette="Blues")
+ax1.bar_label(ax1.containers[0])  # etiquetas arriba
+plt.title("Coincidencias de pares únicos en cada etapa")
+plt.ylabel("Número de coincidencias")
+plt.xlabel("Etapa")
+plt.show()
+
+# --- Gráfico 2: Jaccard vs Diferencia ---
+df_melt = df_metricas.melt(id_vars="Etapa",
+                           value_vars=["Jaccard (%)", "Diferencia simétrica (%)"],
+                           var_name="Métrica", value_name="Valor")
+
+plt.figure(figsize=(8,5))
+ax2 = sns.barplot(x="Etapa", y="Valor", hue="Métrica", data=df_melt, palette="Set2")
+
+# etiquetas arriba de cada barra
+for container in ax2.containers:
+    ax2.bar_label(container, fmt="%.1f")
+
+# ajustar eje Y para ver mejor diferencias
+ax2.set_ylim(0, 110)
+
+plt.title("Comparación de métricas de calidad en cada etapa")
+plt.ylabel("Porcentaje (%)")
+plt.xlabel("Etapa")
+plt.legend(title="Métrica")
+plt.show()
+
+#%% prueba 4
+
+# Datos
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+coincidencias = [300, 498, 513]
+jaccard = [56.0, 89.6, 97.3]
+diferencia = [44.0, 10.4, 5.3]
+
+df_metricas = pd.DataFrame({
+    "Etapa": etapas,
+    "Coincidencias": coincidencias,
+    "Jaccard (%)": jaccard,
+    "Diferencia simétrica (%)": diferencia
+})
+
+# --- Gráfico 1: Coincidencias ---
+plt.figure(figsize=(8,5))
+ax1 = sns.barplot(x="Etapa", y="Coincidencias", data=df_metricas, palette="Blues")
+ax1.bar_label(ax1.containers[0], fmt="%.0f")  # etiquetas arriba
+plt.title("Coincidencias de pares únicos en cada etapa")
+plt.ylabel("Número de coincidencias")
+plt.xlabel("Etapa")
+plt.show()
+
+# --- Gráfico 2: Jaccard vs Diferencia ---
+df_melt = df_metricas.melt(id_vars="Etapa",
+                           value_vars=["Jaccard (%)", "Diferencia simétrica (%)"],
+                           var_name="Métrica", value_name="Valor")
+
+plt.figure(figsize=(8,5))
+ax2 = sns.barplot(x="Etapa", y="Valor", hue="Métrica", data=df_melt, palette="Set2")
+
+# etiquetas arriba de cada barra (recorriendo todos los contenedores)
+for container in ax2.containers:
+    ax2.bar_label(container, fmt="%.1f")
+
+# ajustar eje Y para que se vean mejor las diferencias
+ax2.set_ylim(0, 200)
+
+plt.title("Comparación de métricas de calidad en cada etapa")
+plt.ylabel("Porcentaje (%)")
+plt.xlabel("Etapa")
+plt.legend(title="Métrica")
+plt.show()
+
+#%% prueba 5
+
+# Datos
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+jaccard = [56.0, 89.6, 97.3]
+diferencia = [44.0, 10.4, 5.3]
+
+# Crear DataFrame en formato largo
+df_melt = pd.DataFrame({
+    "Etapa": etapas * 2,
+    "Métrica": ["Jaccard (%)"]*3 + ["Diferencia simétrica (%)"]*3,
+    "Valor": jaccard + diferencia
+})
+
+# Gráfico
+plt.figure(figsize=(8,5))
+ax = sns.barplot(x="Etapa", y="Valor", hue="Métrica", data=df_melt, palette="Set2")
+
+# Etiquetas manuales arriba de cada barra
+for p in ax.patches:
+    ax.annotate(f'{p.get_height():.1f}',
+                (p.get_x() + p.get_width()/2., p.get_height()),
+                ha='center', va='bottom', fontsize=9, color='black', xytext=(0,3),
+                textcoords='offset points')
+
+# Ajustar eje Y para que se vean mejor las diferencias
+ax.set_ylim(0, 110)
+
+plt.title("Comparación de métricas de calidad en cada etapa")
+plt.plot(etapas, jaccard, marker='o', color='green')
+plt.plot(etapas, diferencia, marker='o', color='red')
+plt.ylabel("Porcentaje (%)")
+plt.xlabel("Etapa")
+plt.legend(title="Métrica")
+plt.show()
+
+#%% prueba 6
+
+# Datos de coincidencias en las tres etapas
+etapas = ["Antes limpieza", "Después limpieza", "Después corrección"]
+coincidencias = [300, 498, 513]
+
+# Crear DataFrame
+df_coincidencias = pd.DataFrame({
+    "Etapa": etapas,
+    "Coincidencias": coincidencias
+})
+
+# Gráfico de barras
+plt.figure(figsize=(8,5))
+ax = sns.barplot(x="Etapa", y="Coincidencias", data=df_coincidencias, palette="viridis")
+
+# Etiquetas arriba de cada barra
+for p in ax.patches:
+    ax.annotate(f'{p.get_height():.0f}',
+                (p.get_x() + p.get_width()/2., p.get_height()),
+                ha='center', va='bottom', fontsize=12, color='black', xytext=(0,5),
+                textcoords='offset points')
+
+plt.title("Coincidencias de pares únicos en cada etapa")
+plt.ylabel("Número de coincidencias")
+
+plt.plot(etapas, coincidencias, marker='o', color='red')
+plt.xlabel("Etapa")
+plt.ylim(200, 550)  # ajusto el eje Y para que se vean bien las diferencias
+plt.show()
+
 #%%Limpieza del Dataset Establecimientos Educativos
 
 
