@@ -837,3 +837,260 @@ plt.title("Relación entre población y cantidad de EE por nivel educativo")
 plt.tight_layout()
 plt.show()
 
+#%% P3 - filtro cantidad de EE por departamento y provincia y grafico
+#datos
+consulta = """
+SELECT
+    Provincia,
+    Departamento,
+    COUNT(Departamento) AS Cant_EE
+FROM Establecimientos
+GROUP BY Provincia, Departamento
+ORDER BY Provincia ASC
+"""
+
+df_p3 = dd.sql(consulta).df()
+
+#orden
+consultaMedianas ="""
+SELECT
+    Provincia,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY Cant_EE) AS Mediana
+FROM df_p3
+GROUP BY Provincia
+ORDER BY Mediana ASC
+"""
+
+ordenProvincias = dd.sql(consultaMedianas).df()
+
+plt.figure(figsize=(12,6))
+sns.boxplot(x='Provincia', y='Cant_EE', data=df_p3, order=ordenProvincias['Provincia'].tolist())
+plt.xticks(rotation=90)
+plt.title('BoxPlot de cantidad de establecimientos educativos por departamento por provincia.')
+
+
+#%% P4 - Relación entre la cantidad de empleados cada mil habitantes (para 2022) y de EE cada mil habitantes por departamento.
+
+# df_pob_deptos tiene las poblaciones totales por depto
+
+# Filtro cantidad de empleados por depto
+consultaCantEmpleados = """
+SELECT
+    Provincia,
+    Departamento,
+    SUM(Empleo) AS Empleados
+FROM deptos_actividad_genero
+GROUP BY Provincia, Departamento
+"""
+df_cant_empleados = dd.sql(consultaCantEmpleados).df()
+
+consultaEmpleadosX1000 = """
+SELECT
+    e.Provincia,
+    e.Departamento,
+    (e.Empleados / p.Poblacion) * 1000 AS EmpleadosX1000
+FROM df_cant_empleados AS e
+INNER JOIN df_pob_deptos AS p
+ON e.Provincia = p.Provincia AND e.Departamento = p.Departamento
+"""
+
+df_empleados_mil = dd.sql(consultaEmpleadosX1000).df()
+
+# busco EE por mil habitantes
+
+consultaCantEE = """
+SELECT
+    Provincia,
+    Departamento,
+    COUNT(Departamento) AS Cant_EE
+FROM Establecimientos
+GROUP BY Provincia, Departamento
+"""
+
+df_cant_ee = dd.sql(consultaCantEE).df()
+
+consultaEEX1000 = """
+SELECT
+    e.Provincia,
+    e.Departamento,
+    (e.Cant_EE / p.Poblacion) * 1000 AS CantEEX1000
+FROM df_cant_ee AS e
+INNER JOIN df_pob_deptos AS p
+ON e.Provincia = p.Provincia AND e.Departamento = p.Departamento
+"""
+
+df_ee_mil = dd.sql(consultaEEX1000).df()
+
+# df final para hacer scatter plot
+consulta = """
+SELECT
+    ee.Provincia AS Provincia,
+    ee.CantEEX1000,
+    em.EmpleadosX1000
+FROM df_ee_mil AS ee
+INNER JOIN df_empleados_mil AS em
+ON ee.Provincia = em.Provincia AND ee.Departamento = em.Departamento
+ORDER BY Provincia ASC
+"""
+
+df_p4 = dd.sql(consulta).df()
+#%% P4 - Visualizar con Scatter Plot
+
+plt.figure(figsize=(10,6))
+sns.scatterplot(
+    data=df_p4,
+    x='EmpleadosX1000',
+    y='CantEEX1000',
+    hue='Provincia',
+    palette='tab20',
+    s=30,
+    alpha=0.5)
+
+
+plt.xlabel('Empleados cada 1000 habitantes')
+plt.ylabel('EE cada 1000 habitantes')
+plt.title('Relación entre empleo y establecimientos educativos por departamento')
+plt.grid(alpha=0.3)
+
+plt.legend(
+    title='Provincia',
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    fontsize=7
+)
+
+plt.tight_layout()
+plt.show()
+
+
+#%% P5 -Las 5 actividades (CLAE6) con mayor y menor proporción (respectivamente) 
+# de empleadas mujeres, para 2022. Incluir en el gráfico la proporción promedio de empleo femenino.
+
+consulta = """
+SELECT
+    d.clae6,
+    SUM(d.Empleo) / t.Total AS Proporcion_Mujeres
+FROM deptos_actividad_genero AS d
+JOIN (SELECT
+        SUM(Empleo) AS Total
+    FROM deptos_actividad_genero
+    WHERE Genero='MUJERES') AS t
+ON 1=1
+WHERE d.Genero = 'MUJERES'
+GROUP BY clae6, t.Total
+ORDER BY Proporcion_Mujeres DESC
+"""
+
+
+df_proporcion_m = dd.sql(consulta).df()
+
+
+consultaTops = """
+(
+    SELECT * FROM df_proporcion_m
+    ORDER BY Proporcion_Mujeres DESC
+    LIMIT 5
+)
+UNION ALL
+(
+    SELECT * FROM df_proporcion_m
+    ORDER BY Proporcion_Mujeres ASC
+    LIMIT 5
+)
+"""
+
+df_p5 = dd.sql(consultaTops).df()
+
+#lo ordeno
+consultaOrdenar = """
+SELECT *
+FROM df_p5
+ORDER BY Proporcion_Mujeres ASC
+"""
+df_p5 = dd.sql(consultaOrdenar).df()
+
+#Busco la proporcion promedio total: empleos mujeres / empleos totales
+
+consultaEmpleosMujer = """
+SELECT
+    SUM(Empleo) AS Empleos_Mujer
+FROM deptos_actividad_genero
+WHERE Genero = 'MUJERES'
+"""
+
+consultaTotalEmpleos = """
+SELECT SUM(Empleo) AS Empleos_Totales
+FROM deptos_actividad_genero
+"""
+
+consultaPromedioProporcion = f"""
+SELECT e.Empleos_Mujer / t.Empleos_Totales AS Proporcion_Promedio
+FROM ({consultaEmpleosMujer}) AS e, ({consultaTotalEmpleos}) AS t
+"""
+
+prop_prom = dd.sql(consultaPromedioProporcion).df().iloc[0,0]
+prop_prom = round(prop_prom, 4)
+
+#%% P5 - Visualizo con grafico de barras
+
+df_p5 = df_p5.sort_values(by='Proporcion_Mujeres', ascending=False)
+
+
+plt.figure(figsize=(10,6))
+
+sns.barplot(
+    data=df_p5,
+    x='clae6',
+    y='Proporcion_Mujeres',
+    palette='viridis',
+    order=df_p5['clae6'].tolist()
+)
+plt.yscale('log')
+# línea horizontal del promedio global
+plt.axhline(prop_prom, linestyle='--', linewidth=2)
+
+plt.title('Actividades con mayor y menor proporción de empleo femenino (2022)')
+plt.xlabel('CLAE6')
+plt.ylabel('Proporción de empleo femenino')
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
