@@ -1058,25 +1058,125 @@ plt.show()
 
 
 
+#%% Conclusion - numero de EE es proporcional al numero de EP
+consultaEE = """
+SELECT
+    Provincia,
+    Departamento,
+    COUNT(Departamento) AS Cant_EE
+FROM Establecimientos
+GROUP BY Provincia, Departamento
+"""
+df_ee = dd.sql(consultaEE).df()
+
+consultaEP = """
+SELECT
+    d.Provincia,
+    d.Departamento,
+    SUM(m.Establecimientos) AS Cant_EP
+FROM deptos_actividad_genero AS d
+INNER JOIN (SELECT Provincia, Departamento, MAX(Establecimientos) AS Establecimientos
+    FROM deptos_actividad_genero
+    GROUP BY Provincia, Departamento) AS m
+ON d.Provincia = m.Provincia AND d.Departamento = m.Departamento
+GROUP BY d.Provincia, d.Departamento
+"""
+df_ep = dd.sql(consultaEP).df()
+
+
+
+consultaJoin = """
+SELECT 
+    ee.Provincia,
+    ee.Departamento,
+    ee.Cant_EE,
+    ep.Cant_EP
+FROM df_ee AS ee
+INNER JOIN df_ep AS ep
+ON ee.Provincia = ep.Provincia AND ee.Departamento = ep.Departamento
+"""
+
+est_ee_ep = dd.sql(consultaJoin).df()
+
+#%% Visualizo con scatter plot
+
+plt.figure(figsize=(10,6))
+sns.scatterplot(
+    data=est_ee_ep,
+    x='Cant_EE',
+    y='Cant_EP',
+    hue='Provincia',
+    palette='tab20',
+    s=30,
+    alpha=0.5)
+
+plt.yscale('log')
+plt.xlabel('Cantidad de Establecimientos Educativos')
+plt.ylabel('Cantidad de Establecimientos Productivos')
+plt.title('Relación entre Establecimientos Educativos y Establecimienntos Productivos por departamento')
+plt.grid(alpha=0.3)
+
+plt.legend(
+    title='Provincia',
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    fontsize=7
+)
+
+plt.tight_layout()
+plt.show()
 
 
 
 
+#%% Seria mejor vizualizar sin outliers (Se observan muchos por Cant_EP)
 
+def visualizarScatterPlotSinKOutliers(k:int):
+    consultaOutliers = f"""
+    SELECT *
+    FROM est_ee_ep
+    ORDER BY Cant_EP DESC
+    LIMIT {k}
+    """
+    outliers = dd.sql(consultaOutliers).df()
+    
+    
+    consultaSacar = """
+    SELECT * 
+    FROM est_ee_ep
+    EXCEPT
+    SELECT *
+    FROM outliers
+    """
+    
+    est_ee_ep = dd.sql(consultaSacar).df()
+    plt.figure(figsize=(10,6))
+    sns.scatterplot(
+        data=est_ee_ep,
+        x='Cant_EE',
+        y='Cant_EP',
+        hue='Provincia',
+        palette='tab20',
+        s=30,
+        alpha=0.5)
+    
+    plt.xlabel('Cantidad de Establecimientos Educativos')
+    plt.ylabel('Cantidad de Establecimientos Productivos')
+    plt.title(f'Relación entre Establecimientos Educativos y Establecimienntos Productivos por departamento sin {k} outliers')
+    plt.grid(alpha=0.3)
+    
+    plt.legend(
+        title='Provincia',
+        bbox_to_anchor=(1.05, 1),
+        loc='upper left',
+        fontsize=7
+    )
+    
+    plt.tight_layout()
+    plt.show()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+for k in range(3,15, 3):
+    visualizarScatterPlotSinKOutliers(k)
 
 
 
