@@ -8,6 +8,8 @@ import duckdb as dd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.cm as cm
+
 
 #%% Funciones
 def normalizarColumna(col:str) -> str:
@@ -1181,14 +1183,99 @@ for k in range(3,15, 3):
 
 
 
+#%% Bubble Chart para tener en cuenta el número de poblacion
+consultaFinal = """
+SELECT 
+    base.Provincia,
+    base.Departamento,
+    base.Cant_EE,
+    base.Cant_EP,
+    pob.Poblacion
+FROM est_ee_ep AS base
+INNER JOIN df_pob_deptos AS pob
+ON base.Provincia = pob.Provincia
+   AND base.Departamento = pob.Departamento
+"""
+
+
+est_ee_ep = dd.sql(consultaFinal).df()
+
+
+#%% Bubble final
+
+plt.figure(figsize=(10,6))
+provincias = est_ee_ep['Provincia'].unique()
+colors = cm.get_cmap('tab20', len(provincias))
+
+sns.scatterplot(
+    data=est_ee_ep,
+    x='Cant_EE',
+    y='Cant_EP',
+    hue='Provincia',
+    palette={prov: colors(i) for i, prov in enumerate(provincias)},
+    size='Poblacion',
+    sizes=(20, 800),
+    alpha=0.6)
+plt.yscale('log')
+
+plt.xlabel('Cantidad de Establecimientos Educativos')
+plt.ylabel('Cantidad de Establecimientos Productivos')
+plt.title('Bubble Chart: Educación vs Producción por departamento')
+
+plt.grid(alpha=0.3)
+
+plt.legend(
+    title='Provincia',
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    fontsize=7
+)
+
+plt.tight_layout()
+plt.show()
 
 
 
 
+#%% Repetimos pero usando las 5 provincias con mas poblacion
 
+# lista de provincias en orden estable
+provincias = sorted(est_ee_ep['Provincia'].unique())
 
+# generamos una paleta perceptualmente uniforme
+palette = sns.color_palette("husl", len(provincias))
 
+# mapeo provincia → color distinto
+color_map = {prov: palette[i] for i, prov in enumerate(provincias)}
 
+plt.figure(figsize=(12, 7))
+
+sns.scatterplot(
+    data=est_ee_ep,
+    x='Cant_EE',
+    y='Cant_EP',
+    hue='Provincia',
+    palette=color_map,
+    size='Poblacion',
+    sizes=(20, 800),
+    alpha=0.7
+)
+
+plt.yscale('log')
+plt.xlabel('Cantidad de Establecimientos Educativos')
+plt.ylabel('Cantidad de Establecimientos Productivos')
+plt.title('Bubble Chart: Educación vs Producción por departamento')
+plt.grid(alpha=0.3)
+
+plt.legend(
+    title='Provincia',
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    fontsize=8
+)
+
+plt.tight_layout()
+plt.show()
 
 
 
