@@ -21,7 +21,8 @@ def normalizarColumna(col:str) -> str:
     res = f"REPLACE({res}, '°','')"
     res = f"REPLACE({res}, 'Ü','U')"
     res = f"REPLACE({res}, '''','')"
-    # res = f"REPLACE({res},'.', '')"
+    res = f"REPLACE({res},'.', '')"
+    res = f"REPLACE ({res}, 'CIUDAD DE BUENOS AIRES','CABA')"
     
     return res
 def consultarCantNivelesPorDepto(nivel:str, nombreDelCount:str):
